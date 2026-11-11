@@ -715,18 +715,35 @@ export class LanguageManager {
   generateContent(options: WordSelectionOptions): string[] {
     const { language, difficulty, contentType, count, avoidRepeats = true } = options;
 
-    let sourceList: string[];
     if (contentType === "phrases") {
-      sourceList = this.getPhraseList(language, difficulty);
-    } else {
-      sourceList = this.getWordList(language, difficulty);
+      const phrases = this.getPhraseList(language, difficulty);
+      const shuffled = [...phrases].sort(() => Math.random() - 0.5);
+      const resultWords: string[] = [];
+      let phraseIdx = 0;
+
+      while (resultWords.length < count && phraseIdx < shuffled.length * 3) {
+        const phrase = shuffled[phraseIdx % shuffled.length];
+        const tokens = phrase.trim().split(/\s+/).filter(Boolean);
+        for (const token of tokens) {
+          resultWords.push(token);
+          if (resultWords.length >= count) break;
+        }
+        phraseIdx++;
+      }
+      return resultWords;
+    }
+
+    const sourceList = this.getWordList(language, difficulty);
+    // Flatten any compound words into single word tokens
+    const flattenedList: string[] = [];
+    for (const item of sourceList) {
+      const tokens = item.trim().split(/\s+/).filter(Boolean);
+      flattenedList.push(...tokens);
     }
 
     const result: string[] = [];
-    const availableItems = avoidRepeats ? sourceList.filter((item) => !this.recentWords.has(item)) : sourceList;
-
-    // If we don't have enough unique items, use the full list
-    const itemsToUse = availableItems.length >= count ? availableItems : sourceList;
+    const availableItems = avoidRepeats ? flattenedList.filter((item) => !this.recentWords.has(item)) : flattenedList;
+    const itemsToUse = availableItems.length >= count ? availableItems : flattenedList;
 
     for (let i = 0; i < count; i++) {
       const randomIndex = Math.floor(Math.random() * itemsToUse.length);

@@ -1,15 +1,47 @@
 "use client";
 
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ThemeSelector } from "@/components/theme-selector";
-import { PreferencesManager } from "@/lib/preferences";
-import React from "react";
+import { PracticeSidebar } from "@/components/practice-sidebar";
+import { Dashboard } from "@/components/dashboard";
+import type { DashboardTab } from "@/components/dashboard/data";
+import { TestResult } from "@/components/test-result";
+import { StatTile } from "@/components/data-display";
+import { SegmentedHighlight } from "@/components/ui/segmented";
 
-import { StatisticsDashboard } from "@/components/statistics-dashboard";
+import { PreferencesManager } from "@/lib/preferences";
 import { adaptiveAlgorithm } from "@/lib/adaptive-algorithm";
 import { languageManager, type ContentType, type DifficultyType, type LanguageType } from "@/lib/languages";
-import type { Achievement, ScoreEntry } from "@/lib/scoring-system";
+import {
+  scoringSystem,
+  type Achievement,
+  type ScoreEntry,
+  type StreakData,
+} from "@/lib/scoring-system";
 import { StatisticsManager, type GameSession } from "@/lib/statistics";
-import { useCallback, useRef, useState } from "react";
+import { soundManager, type SwitchType } from "@/lib/audio";
+
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Keyboard,
+  RotateCcw,
+  Volume2,
+  VolumeX,
+  Flame,
+  Brain,
+  BarChart3,
+  Globe,
+  Gauge,
+  Clock,
+  Sparkle,
+  Type,
+  Quote,
+  PanelRight,
+  PanelRightClose,
+} from "lucide-react";
+
+type ModeType = "words" | "time" | "phrases";
 
 interface GameStats {
   wpm: number;
@@ -20,707 +52,1073 @@ interface GameStats {
   consistency: number;
 }
 
-interface GameState {
-  isActive: boolean;
-  isComplete: boolean;
-  currentWordIndex: number;
-  currentCharIndex: number;
-  userInput: string;
-  words: string[];
-  startTime: number | null;
-  errors: Set<number>;
-  perfectWords: number;
-}
-
 export default function TypingGame() {
-  const [preferences, setPreferences] = useState(() => PreferencesManager.getPreferences());
+  // Giá trị khởi tạo phải trùng với bản render trên server (mặc định), sau đó
+  // mới áp lựa chọn đã lưu trong useEffect — tránh lỗi hydration mismatch.
+  const [language, setLanguage] = useState<LanguageType>("english");
+  const [difficulty, setDifficulty] = useState<DifficultyType>("medium");
+  const [mode, setMode] = useState<ModeType>("words");
+  const [wordCount, setWordCount] = useState<number>(25);
+  const [timeLimit, setTimeLimit] = useState<number>(30); // 15, 30, 60, 120
+  const [soundSwitch, setSoundSwitch] = useState<SwitchType>("blue");
+  const [avoidRepeats, setAvoidRepeats] = useState<boolean>(true);
+  const [adaptiveMode, setAdaptiveMode] = useState<boolean>(true);
 
-  const [language, setLanguage] = useState<LanguageType>(preferences.language as LanguageType);
-  const [difficulty, setDifficulty] = useState<DifficultyType>(preferences.difficulty as DifficultyType);
-  const [contentType, setContentType] = useState<ContentType>(preferences.contentType as ContentType);
-  const [wordCount, setWordCount] = useState(preferences.wordCount);
-  const [avoidRepeats, setAvoidRepeats] = useState(preferences.avoidRepeats);
-  const [adaptiveMode, setAdaptiveMode] = useState(preferences.adaptiveMode);
+  // Active Game State
+  const [words, setWords] = useState<string[]>([]);
+  const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
+  const [userInput, setUserInput] = useState<string>("");
+  const [wordStatuses, setWordStatuses] = useState<("correct" | "incorrect" | "pending")[]>([]);
+  const [wordInputs, setWordInputs] = useState<string[]>([]); // What user actually typed per word
+  const [isActive, setIsActive] = useState<boolean>(false);
+  const [isComplete, setIsComplete] = useState<boolean>(false);
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [perfectWordsCount, setPerfectWordsCount] = useState<number>(0);
+  const [errorCount, setErrorCount] = useState<number>(0);
+  const [isFocused, setIsFocused] = useState<boolean>(false);
 
-  const [gameState, setGameState] = useState<GameState>({
-    isActive: false,
-    isComplete: false,
-    currentWordIndex: 0,
-    currentCharIndex: 0,
-    userInput: "",
-    words: [],
-    startTime: null,
-    errors: new Set(),
-    perfectWords: 0,
-  });
-  const [stats, setStats] = useState<GameStats>({
-    wpm: 0,
-    accuracy: 100,
-    correctChars: 0,
-    totalChars: 0,
-    timeElapsed: 0,
-    consistency: 100,
-  });
-  const [typingHints, setTypingHints] = useState<string[]>([]);
-  const [adaptiveAlert, setAdaptiveAlert] = useState<string | null>(null);
+  // Realtime & Post-test stats
+  // HUD được suy ra từ trạng thái hiện tại + nhịp tick, không còn phụ thuộc
+  // vào một interval bị khởi tạo lại sau mỗi lần gõ phím (nguyên nhân HUD đứng yên).
+  const [, setTick] = useState<number>(0);
+  const [finalStats, setFinalStats] = useState<GameStats | null>(null);
+  const [wpmTimeline, setWpmTimeline] = useState<number[]>([]);
   const [currentScore, setCurrentScore] = useState<ScoreEntry | null>(null);
   const [newAchievements, setNewAchievements] = useState<Achievement[]>([]);
-  const [wpmHistory, setWpmHistory] = useState<number[]>([]);
-  const [showStats, setShowStats] = useState(false);
+  const [adaptiveAlert, setAdaptiveAlert] = useState<string | null>(null);
+  const [alertLeaving, setAlertLeaving] = useState<boolean>(false);
 
+  // Dashboard
+  const [dashboardOpen, setDashboardOpen] = useState<boolean>(false);
+  const [dashboardTab, setDashboardTab] = useState<DashboardTab>("overview");
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+
+  // Refs
   const inputRef = useRef<HTMLInputElement>(null);
+  const wordsContainerRef = useRef<HTMLDivElement>(null);
+  const activeCharRef = useRef<HTMLSpanElement>(null);
+  const activeWordRef = useRef<HTMLSpanElement>(null);
+  const statsRef = useRef<GameStats | null>(null);
+  const timeUpHandledRef = useRef<boolean>(false);
 
-  const generateWords = useCallback(() => {
-    let selectedDifficulty = difficulty;
+  // Streak & lịch sử gần đây (chỉ đọc localStorage khi cần, không đọc mỗi lần gõ phím)
+  const [streakInfo, setStreakInfo] = useState<StreakData | null>(null);
+  const [recentSessions, setRecentSessions] = useState<GameSession[]>([]);
 
+  const openDashboard = useCallback((tab: DashboardTab = "overview") => {
+    setDashboardTab(tab);
+    setDashboardOpen(true);
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((open) => {
+      PreferencesManager.savePreferences({ sidebarOpen: !open });
+      return !open;
+    });
+  }, []);
+
+  useEffect(() => {
+    setStreakInfo(scoringSystem.getStreakInfo());
+    setRecentSessions(StatisticsManager.getRecentSessions(7).slice(0, 3));
+  }, [isComplete]);
+
+  // Generate words
+  const generateWordsList = useCallback(() => {
+    let effectiveDifficulty = difficulty;
     if (adaptiveMode) {
-      const skillAssessment = adaptiveAlgorithm.assessSkill();
-      selectedDifficulty = skillAssessment.recommendedDifficulty;
-
-      const weights = adaptiveAlgorithm.getWordSelectionWeights(language);
-
-      if (Object.keys(weights).length > 0) {
-        return languageManager.generateContent({
-          language,
-          difficulty: selectedDifficulty,
-          contentType,
-          count: wordCount,
-          avoidRepeats,
-        });
-      }
+      const assessment = adaptiveAlgorithm.assessSkill();
+      effectiveDifficulty = assessment.recommendedDifficulty;
     }
 
-    return languageManager.generateContent({
+    const countToGenerate = mode === "time" ? 100 : wordCount;
+    const contentType: ContentType = mode === "phrases" ? "phrases" : "words";
+
+    const generated = languageManager.generateContent({
       language,
-      difficulty: selectedDifficulty,
+      difficulty: effectiveDifficulty,
       contentType,
-      count: wordCount,
+      count: countToGenerate,
       avoidRepeats,
     });
-  }, [language, difficulty, contentType, wordCount, avoidRepeats, adaptiveMode]);
 
+    return generated;
+  }, [language, difficulty, mode, wordCount, avoidRepeats, adaptiveMode]);
+
+  // Initialize or Reset test
   const initializeGame = useCallback(() => {
-    const words = generateWords();
-    setGameState({
-      isActive: false,
-      isComplete: false,
-      currentWordIndex: 0,
-      currentCharIndex: 0,
-      userInput: "",
-      words,
-      startTime: null,
-      errors: new Set(),
-      perfectWords: 0,
-    });
-    setStats({
-      wpm: 0,
-      accuracy: 100,
-      correctChars: 0,
-      totalChars: 0,
-      timeElapsed: 0,
-      consistency: 100,
-    });
-    setTypingHints(languageManager.getTypingHints(language));
-    setAdaptiveAlert(null);
+    const newWords = generateWordsList();
+    setWords(newWords);
+    setCurrentWordIndex(0);
+    setUserInput("");
+    setWordStatuses(new Array(newWords.length).fill("pending"));
+    setWordInputs(new Array(newWords.length).fill(""));
+    setIsActive(false);
+    setIsComplete(false);
+    setStartTime(null);
+    setPerfectWordsCount(0);
+    setErrorCount(0);
+    setFinalStats(null);
+    setTick(0);
+    timeUpHandledRef.current = false;
+    setWpmTimeline([]);
     setCurrentScore(null);
     setNewAchievements([]);
-    setWpmHistory([]);
+    setAdaptiveAlert(null);
 
     if (adaptiveMode) {
-      adaptiveAlgorithm.startSession(language, difficulty, contentType, wordCount);
+      adaptiveAlgorithm.startSession(language, difficulty, mode === "phrases" ? "phrases" : "words", wordCount);
     }
-  }, [generateWords, language, difficulty, contentType, wordCount, adaptiveMode]);
 
-  const calculateStats = useCallback(
-    (state: GameState) => {
-      if (!state.startTime) return stats;
+    // Scroll word container back to top
+    if (wordsContainerRef.current) {
+      wordsContainerRef.current.scrollTop = 0;
+    }
 
-      const timeElapsed = (Date.now() - state.startTime) / 1000 / 60; // minutes
+    // Focus input
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+  }, [generateWordsList, adaptiveMode, language, difficulty, mode, wordCount]);
 
-      // Calculate correctly typed characters more accurately
-      let correctChars = 0;
+  // Initialize on mount or when key settings change
+  useEffect(() => {
+    initializeGame();
+  }, [initializeGame]);
 
-      // Count all completed words (they were typed correctly to advance)
-      for (let i = 0; i < state.currentWordIndex; i++) {
-        correctChars += state.words[i].length + 1; // +1 for space
+  // Synchronize sound manager
+  useEffect(() => {
+    soundManager.setSwitchType(soundSwitch);
+  }, [soundSwitch]);
+
+  // Áp lựa chọn đã lưu SAU khi hydrate: lần render đầu tiên luôn dùng mặc định
+  // giống server, nên không còn lệch HTML giữa server và client.
+  useEffect(() => {
+    const saved = PreferencesManager.getPreferences();
+    setLanguage((saved.language as LanguageType) || "english");
+    setDifficulty((saved.difficulty as DifficultyType) || "medium");
+    setMode(saved.contentType === "phrases" ? "phrases" : "words");
+    setWordCount(saved.wordCount || 25);
+    setAvoidRepeats(saved.avoidRepeats ?? true);
+    setAdaptiveMode(saved.adaptiveMode ?? true);
+    setSidebarOpen(saved.sidebarOpen ?? true);
+  }, []);
+
+  // Calculate stats helper
+  const calculateCurrentStats = useCallback(
+    (
+      currentWordIdx: number,
+      currentInput: string,
+      statuses: ("correct" | "incorrect" | "pending")[],
+      wordsList: string[],
+      inputsList: string[],
+      elapsedSeconds: number
+    ): GameStats => {
+      if (elapsedSeconds <= 0) {
+        return {
+          wpm: 0,
+          accuracy: 100,
+          correctChars: 0,
+          totalChars: 0,
+          timeElapsed: 0,
+          consistency: 100,
+        };
       }
 
-      // For current word, only count correctly typed characters
-      if (state.currentWordIndex < state.words.length) {
-        const currentWord = state.words[state.currentWordIndex];
-        const userInput = state.userInput;
+      let correctChars = 0;
+      let totalTypedChars = 0;
 
-        for (let i = 0; i < Math.min(userInput.length, currentWord.length); i++) {
-          if (userInput[i] === currentWord[i]) {
-            correctChars++;
+      // Count characters from completed words
+      for (let i = 0; i < currentWordIdx; i++) {
+        const targetWord = wordsList[i];
+        const typedWord = inputsList[i] || "";
+        totalTypedChars += typedWord.length + 1; // +1 for space
+
+        if (statuses[i] === "correct") {
+          correctChars += targetWord.length + 1;
+        } else {
+          // Count partial correct
+          for (let j = 0; j < Math.min(typedWord.length, targetWord.length); j++) {
+            if (typedWord[j] === targetWord[j]) correctChars++;
           }
         }
       }
 
-      // Remove the extra space from the last word if we're at the end
-      if (state.currentWordIndex > 0) {
-        correctChars -= 1;
+      // Count characters in current word
+      if (currentWordIdx < wordsList.length) {
+        const targetWord = wordsList[currentWordIdx];
+        totalTypedChars += currentInput.length;
+        for (let j = 0; j < Math.min(currentInput.length, targetWord.length); j++) {
+          if (currentInput[j] === targetWord[j]) correctChars++;
+        }
       }
 
-      // Calculate total attempted characters for accuracy
-      const totalAttemptedChars = state.words.slice(0, state.currentWordIndex).join(" ").length + state.currentCharIndex;
+      const elapsedMinutes = elapsedSeconds / 60;
+      const wpm = elapsedMinutes > 0 ? Math.round(correctChars / 5 / elapsedMinutes) : 0;
+      const accuracy = totalTypedChars > 0 ? Math.round((correctChars / totalTypedChars) * 100) : 100;
 
-      // WPM based on correctly typed characters only (standard: 5 characters = 1 word)
-      const wpm = timeElapsed > 0 ? Math.round(correctChars / 5 / timeElapsed) : 0;
-
-      // Accuracy based on correct vs attempted characters
-      const accuracy = totalAttemptedChars > 0 ? Math.round((correctChars / totalAttemptedChars) * 100) : 100;
-
-      // Calculate consistency (based on WPM variance)
-      const recentWpmHistory = [...wpmHistory, wpm].slice(-10);
+      // Consistency based on timeline
       let consistency = 100;
-      if (recentWpmHistory.length > 1) {
-        const avgWpm = recentWpmHistory.reduce((a, b) => a + b, 0) / recentWpmHistory.length;
-        const variance = recentWpmHistory.reduce((acc, w) => acc + Math.pow(w - avgWpm, 2), 0) / recentWpmHistory.length;
-        consistency = Math.max(0, 100 - Math.sqrt(variance));
+      if (wpmTimeline.length > 2) {
+        const mean = wpmTimeline.reduce((a, b) => a + b, 0) / wpmTimeline.length;
+        const variance = wpmTimeline.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / wpmTimeline.length;
+        consistency = Math.max(0, Math.min(100, Math.round(100 - Math.sqrt(variance))));
       }
 
       return {
         wpm,
-        accuracy,
+        accuracy: Math.min(100, accuracy),
         correctChars,
-        totalChars: totalAttemptedChars,
-        timeElapsed: timeElapsed * 60, // convert back to seconds
+        totalChars: totalTypedChars,
+        timeElapsed: elapsedSeconds,
         consistency,
       };
     },
-    [stats, wpmHistory]
+    [wpmTimeline]
   );
 
-  const handleInput = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
+  // Complete Game Session
+  const finishGame = useCallback(
+    (
+      finalWordIdx: number,
+      finalInput: string,
+      finalStatuses: ("correct" | "incorrect" | "pending")[],
+      finalWords: string[],
+      finalInputs: string[],
+      elapsedSec: number
+    ) => {
+      setIsActive(false);
+      setIsComplete(true);
 
-      setGameState((prevState) => {
-        if (!prevState.isActive && !prevState.startTime) {
-          return {
-            ...prevState,
-            isActive: true,
-            startTime: Date.now(),
-            userInput: value,
-          };
-        }
+      const computed = calculateCurrentStats(
+        finalWordIdx,
+        finalInput,
+        finalStatuses,
+        finalWords,
+        finalInputs,
+        elapsedSec
+      );
+      setFinalStats(computed);
 
-        const currentWord = prevState.words[prevState.currentWordIndex];
+      // Score record
+      const sessionData = {
+        wpm: computed.wpm,
+        accuracy: computed.accuracy,
+        consistency: computed.consistency,
+        language,
+        difficulty,
+        contentType: mode,
+        wordCount: finalWordIdx,
+        timeElapsed: elapsedSec,
+        perfectWords: perfectWordsCount,
+        totalWords: Math.max(finalWordIdx, 1),
+      };
 
-        const newErrors = new Set<number>();
+      const userSummary = StatisticsManager.calculateSummary();
+      const langStats = StatisticsManager.getLanguageStats();
 
-        // Only track errors in current word
-        for (let i = 0; i < value.length && i < currentWord.length; i++) {
-          if (value[i] !== currentWord[i]) {
-            newErrors.add(prevState.currentWordIndex * 1000 + i);
-          }
-        }
-
-        // Add error for typing beyond word length
-        if (value.length > currentWord.length) {
-          newErrors.add(prevState.currentWordIndex * 1000 + currentWord.length);
-        }
-
-        // Check if word is completed
-        if (value.endsWith(" ") && value.trim() === currentWord) {
-          const nextWordIndex = prevState.currentWordIndex + 1;
-          const perfectWords = value.trim() === currentWord ? prevState.perfectWords + 1 : prevState.perfectWords;
-
-          if (nextWordIndex >= prevState.words.length) {
-            // Game completed
-            const finalState = {
-              ...prevState,
-              isComplete: true,
-              isActive: false,
-              currentWordIndex: nextWordIndex,
-              currentCharIndex: 0,
-              userInput: "",
-              errors: new Set<number>(), // Clear errors for final calculation
-              perfectWords,
-            };
-
-            // Calculate final stats and score
-            const finalStats = calculateStats(finalState);
-            setStats(finalStats);
-            setWpmHistory((prev) => [...prev, finalStats.wpm]);
-
-            if (finalState.startTime) {
-              const scoreData = {
-                wpm: finalStats.wpm,
-                accuracy: finalStats.accuracy,
-                consistency: finalStats.consistency,
-                timeElapsed: finalStats.timeElapsed,
-                wordCount,
-                difficulty,
-                language,
-                perfectWords,
-                totalWords: prevState.words.length,
-                errorCount: newErrors.size,
-              };
-
-              const { score, achievements } = adaptiveAlgorithm.calculateScore(scoreData);
-              setCurrentScore(score);
-              setNewAchievements(achievements);
-
-              const session: GameSession = {
-                id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                timestamp: Date.now(),
-                language,
-                difficulty,
-                contentType,
-                wordCount,
-                wpm: finalStats.wpm,
-                accuracy: finalStats.accuracy,
-                consistency: finalStats.consistency,
-                totalScore: score.totalScore,
-                rating: score.rating,
-                timeElapsed: finalStats.timeElapsed,
-                perfectWords,
-                totalWords: prevState.words.length,
-                errorCount: newErrors.size,
-                achievements: achievements.map((a) => a.name),
-              };
-              StatisticsManager.saveSession(session);
-
-              // Track performance for adaptive algorithm
-              if (adaptiveMode) {
-                adaptiveAlgorithm.recordPerformance({
-                  wpm: finalStats.wpm,
-                  accuracy: finalStats.accuracy,
-                  consistency: finalStats.consistency,
-                  difficulty,
-                  language,
-                  contentType,
-                  wordCount,
-                  errorPatterns: Array.from(newErrors),
-                  timestamp: Date.now(),
-                });
-              }
-            }
-
-            return finalState;
-          }
-
-          return {
-            ...prevState,
-            currentWordIndex: nextWordIndex,
-            currentCharIndex: 0,
-            userInput: "",
-            errors: new Set<number>(), // Clear errors when moving to next word
-            perfectWords,
-          };
-        }
-
-        return {
-          ...prevState,
-          currentCharIndex: value.length,
-          userInput: value,
-          errors: newErrors,
-        };
+      const { scoreEntry, newAchievements: unlocked } = scoringSystem.recordScore(sessionData, {
+        ...userSummary,
+        languagesUsed: langStats.length,
       });
 
-      // Update stats in real-time
-      setStats((prevStats) => {
-        const newStats = calculateStats({
-          ...gameState,
-          userInput: value,
+      setCurrentScore(scoreEntry);
+      setNewAchievements(unlocked);
+
+      // Save to StatisticsManager
+      const session: GameSession = {
+        id: scoreEntry.id,
+        timestamp: scoreEntry.timestamp,
+        language,
+        difficulty,
+        contentType: mode,
+        wordCount: finalWordIdx,
+        wpm: computed.wpm,
+        accuracy: computed.accuracy,
+        consistency: computed.consistency,
+        totalScore: scoreEntry.score,
+        rating: scoreEntry.rating.overall,
+        timeElapsed: elapsedSec,
+        perfectWords: perfectWordsCount,
+        totalWords: Math.max(finalWordIdx, 1),
+        errorCount,
+        achievements: unlocked.map((a) => a.name),
+      };
+      StatisticsManager.saveSession(session);
+
+      // Adaptive algorithm record
+      if (adaptiveMode) {
+        adaptiveAlgorithm.recordPerformance({
+          wpm: computed.wpm,
+          accuracy: computed.accuracy,
+          consistency: computed.consistency,
+          difficulty,
+          language,
+          contentType: mode,
+          wordCount: finalWordIdx,
+          errorPatterns: [],
+          timestamp: Date.now(),
         });
-
-        if (newStats.wpm > prevStats.wpm && newStats.wpm > 0) {
-          setWpmHistory((prev) => [...prev.slice(-9), newStats.wpm]);
-        }
-
-        return newStats;
-      });
-
-      if (adaptiveMode && gameState.startTime) {
-        const currentPerformance = {
-          wpm: stats.wpm,
-          accuracy: stats.accuracy,
-          consistency: stats.consistency,
-        };
-
-        const feedback = adaptiveAlgorithm.getRealtimeFeedback(currentPerformance);
-        if (feedback) {
-          setAdaptiveAlert(feedback);
-          setTimeout(() => setAdaptiveAlert(null), 3000);
-        }
       }
     },
-    [gameState, calculateStats, stats, wordCount, difficulty, language, adaptiveMode, contentType]
+    [
+      calculateCurrentStats,
+      language,
+      difficulty,
+      mode,
+      perfectWordsCount,
+      errorCount,
+      adaptiveMode,
+    ]
   );
 
-  const resetGame = useCallback(() => {
-    initializeGame();
-    inputRef.current?.focus();
-  }, [initializeGame]);
+  // Nhịp cập nhật HUD: interval chỉ phụ thuộc trạng thái chạy, KHÔNG phụ thuộc
+  // từng lần gõ phím — trước đây mỗi keystroke lại clear + tạo lại interval nên
+  // đồng hồ không bao giờ chạm 1 giây và WPM/độ chính xác bị "đóng băng".
+  useEffect(() => {
+    if (!isActive || isComplete || !startTime) return;
 
-  const clearAllData = useCallback(() => {
-    const confirmed = window.confirm(
-      "Bạn có chắc chắn muốn xóa tất cả dữ liệu? Điều này sẽ xóa:\n\n" +
-        "• Tất cả thống kê và lịch sử\n" +
-        "• Cài đặt theme và preferences\n" +
-        "• Dữ liệu adaptive algorithm\n\n" +
-        "Hành động này không thể hoàn tác!"
+    const id = setInterval(() => setTick((value) => value + 1), 200);
+    return () => clearInterval(id);
+  }, [isActive, isComplete, startTime]);
+
+  // Số giây đã trôi qua, suy ra trực tiếp từ startTime + nhịp tick
+  const elapsedSeconds =
+    isActive && startTime && !isComplete
+      ? Math.max(1, Math.floor((Date.now() - startTime) / 1000))
+      : 0;
+
+  // HUD realtime: tính lại mỗi lần render (rẻ, chỉ vài chục từ)
+  const liveStats: GameStats =
+    finalStats ??
+    calculateCurrentStats(
+      currentWordIndex,
+      userInput,
+      wordStatuses,
+      words,
+      wordInputs,
+      elapsedSeconds
     );
 
-    if (confirmed) {
-      // Clear all localStorage data
-      const keysToRemove = ["typeflow-sessions", "typeflow-preferences", "typeflow-theme", "typeflow-adaptive-data"];
+  // Giữ bản mới nhất cho các effect chỉ chạy theo giây
+  useEffect(() => {
+    statsRef.current = liveStats;
+  }, [liveStats]);
 
-      keysToRemove.forEach((key) => {
-        localStorage.removeItem(key);
-      });
+  const timeLeft = mode === "time" ? Math.max(0, timeLimit - elapsedSeconds) : timeLimit;
 
-      // Reset all state to defaults
-      const defaultPrefs = PreferencesManager.getPreferences();
-      setPreferences(defaultPrefs);
-      setLanguage(defaultPrefs.language as LanguageType);
-      setDifficulty(defaultPrefs.difficulty as DifficultyType);
-      setContentType(defaultPrefs.contentType as ContentType);
-      setWordCount(defaultPrefs.wordCount);
-      setAvoidRepeats(defaultPrefs.avoidRepeats);
-      setAdaptiveMode(defaultPrefs.adaptiveMode);
+  // Ghi timeline WPM đúng 1 điểm mỗi giây (thay cho việc push trong interval cũ)
+  useEffect(() => {
+    if (!isActive || isComplete || !startTime) return;
+    const snapshot = statsRef.current;
+    if (!snapshot) return;
+    setWpmTimeline((prev) => [...prev, snapshot.wpm]);
+  }, [elapsedSeconds, isActive, isComplete, startTime]);
 
-      // Reset game state
+  // Phản hồi AI Coach mỗi 4 giây
+  useEffect(() => {
+    if (!adaptiveMode || !isActive || isComplete) return;
+    if (elapsedSeconds === 0 || elapsedSeconds % 4 !== 0) return;
+    const snapshot = statsRef.current;
+    if (!snapshot) return;
+
+    const feedback = adaptiveAlgorithm.getRealtimeFeedback({
+      wpm: snapshot.wpm,
+      accuracy: snapshot.accuracy,
+      consistency: snapshot.consistency,
+    });
+
+    if (feedback) {
+      setAdaptiveAlert(feedback);
+      setAlertLeaving(false);
+      const timeout = setTimeout(() => {
+        // Chạy exit animation trước khi unmount, tránh biến mất đột ngột.
+        setAlertLeaving(true);
+        window.setTimeout(() => {
+          setAdaptiveAlert(null);
+          setAlertLeaving(false);
+        }, 180);
+      }, 3000);
+      return () => clearTimeout(timeout);
+    }
+  }, [elapsedSeconds, adaptiveMode, isActive, isComplete]);
+
+  // Hết giờ ở chế độ đếm ngược
+  useEffect(() => {
+    if (mode !== "time" || !isActive || isComplete || !startTime) return;
+    if (elapsedSeconds < timeLimit || timeUpHandledRef.current) return;
+
+    timeUpHandledRef.current = true;
+    finishGame(currentWordIndex, userInput, wordStatuses, words, wordInputs, timeLimit);
+  }, [
+    mode,
+    isActive,
+    isComplete,
+    startTime,
+    elapsedSeconds,
+    timeLimit,
+    currentWordIndex,
+    userInput,
+    wordStatuses,
+    words,
+    wordInputs,
+    finishGame,
+  ]);
+
+  // Keep word container scrolled so active word is in view
+  useEffect(() => {
+    if (activeWordRef.current && wordsContainerRef.current) {
+      const container = wordsContainerRef.current;
+      const wordElem = activeWordRef.current;
+      const relativeTop = wordElem.offsetTop - container.offsetTop;
+
+      if (relativeTop > 65) {
+        container.scrollTo({
+          top: relativeTop - 40,
+          behavior: "smooth",
+        });
+      } else if (relativeTop < 20) {
+        container.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+      }
+    }
+  }, [currentWordIndex]);
+
+  // Handle Input typing
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isComplete) return;
+
+    const value = e.target.value;
+
+    // First keystroke starts the game
+    if (!isActive && !startTime) {
+      setIsActive(true);
+      setStartTime(Date.now());
+    }
+
+    const currentWord = words[currentWordIndex];
+
+    // Space key detection: user wants to complete word and advance
+    if (value.endsWith(" ")) {
+      const typedWord = value.trim();
+
+      // If user hit space without typing anything, ignore
+      if (typedWord.length === 0) {
+        setUserInput("");
+        return;
+      }
+
+      const isCorrect = typedWord === currentWord;
+
+      // Sound feedback
+      soundManager.playKeypress(true, !isCorrect);
+
+      const nextStatuses = [...wordStatuses];
+      nextStatuses[currentWordIndex] = isCorrect ? "correct" : "incorrect";
+      setWordStatuses(nextStatuses);
+
+      const nextInputs = [...wordInputs];
+      nextInputs[currentWordIndex] = typedWord;
+      setWordInputs(nextInputs);
+
+      if (isCorrect) {
+        setPerfectWordsCount((prev) => prev + 1);
+      } else {
+        setErrorCount((prev) => prev + 1);
+      }
+
+      const nextWordIdx = currentWordIndex + 1;
+
+      // Dynamic word append for time mode if user is near end
+      if (mode === "time" && nextWordIdx >= words.length - 10) {
+        const moreWords = generateWordsList();
+        setWords((prev) => [...prev, ...moreWords]);
+        setWordStatuses((prev) => [...prev, ...new Array(moreWords.length).fill("pending")]);
+        setWordInputs((prev) => [...prev, ...new Array(moreWords.length).fill("")]);
+      }
+
+      // Check if test completed in word/phrase mode
+      if (mode !== "time" && nextWordIdx >= words.length) {
+        const elapsedSec = startTime ? Math.max(1, Math.round((Date.now() - startTime) / 1000)) : 1;
+        finishGame(nextWordIdx, "", nextStatuses, words, nextInputs, elapsedSec);
+        return;
+      }
+
+      setCurrentWordIndex(nextWordIdx);
+      setUserInput("");
+      return;
+    }
+
+    // Normal typing within word
+    const isErrorChar =
+      value.length > 0 &&
+      (value.length > currentWord.length || value[value.length - 1] !== currentWord[value.length - 1]);
+
+    soundManager.playKeypress(false, isErrorChar);
+    setUserInput(value);
+
+    // If on the last word and user typed it completely and accurately, finish immediately!
+    if (
+      mode !== "time" &&
+      currentWordIndex === words.length - 1 &&
+      value === currentWord
+    ) {
+      const nextStatuses = [...wordStatuses];
+      nextStatuses[currentWordIndex] = "correct";
+      setWordStatuses(nextStatuses);
+
+      const nextInputs = [...wordInputs];
+      nextInputs[currentWordIndex] = value;
+      setWordInputs(nextInputs);
+
+      setPerfectWordsCount((prev) => prev + 1);
+
+      const elapsedSec = startTime ? Math.max(1, Math.round((Date.now() - startTime) / 1000)) : 1;
+      finishGame(currentWordIndex + 1, "", nextStatuses, words, nextInputs, elapsedSec);
+    }
+  };
+
+  // Keyboard shortcut handlers (Tab + Enter for restart, Backspace to previous word)
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Quick Restart with Tab or Esc
+    if (e.key === "Tab" || e.key === "Escape") {
+      e.preventDefault();
       initializeGame();
-
-      alert("Đã xóa tất cả dữ liệu thành công!");
-    }
-  }, [initializeGame]);
-
-  // Initialize game on mount and when settings change
-  React.useEffect(() => {
-    initializeGame();
-  }, [initializeGame]);
-
-  React.useEffect(() => {
-    const savedTheme = preferences.theme;
-    if (savedTheme) {
-      // Apply theme by dispatching custom event
-      window.dispatchEvent(new CustomEvent("apply-theme", { detail: savedTheme }));
-    }
-  }, [preferences.theme]);
-
-  const renderWord = (word: string, wordIndex: number) => {
-    const isCurrentWord = wordIndex === gameState.currentWordIndex;
-    const isCompletedWord = wordIndex < gameState.currentWordIndex;
-
-    if (isCurrentWord) {
-      return (
-        <span
-          key={wordIndex}
-          className="relative"
-        >
-          {word.split("").map((char, charIndex) => {
-            const isTyped = charIndex < gameState.currentCharIndex;
-            const isCorrect = isTyped && gameState.userInput[charIndex] === char;
-            const isIncorrect = isTyped && gameState.userInput[charIndex] !== char;
-            const isCursor = charIndex === gameState.currentCharIndex;
-
-            return (
-              <span
-                key={charIndex}
-                className={`relative ${
-                  isCorrect
-                    ? "text-green-400 bg-green-400/10"
-                    : isIncorrect
-                    ? "text-red-400 bg-red-400/20"
-                    : isCursor
-                    ? "bg-primary/30 animate-pulse"
-                    : "text-muted-foreground"
-                }`}
-              >
-                {char}
-              </span>
-            );
-          })}
-          {gameState.currentCharIndex === word.length && <span className="bg-primary/30 animate-pulse ml-1">|</span>}
-        </span>
-      );
+      return;
     }
 
-    return (
-      <span
-        key={wordIndex}
-        className={isCompletedWord ? "text-green-400" : "text-muted-foreground"}
-      >
-        {word}
-      </span>
-    );
+    // If Backspace pressed on empty input and not on first word, go back to previous word
+    if (e.key === "Backspace" && userInput === "" && currentWordIndex > 0) {
+      e.preventDefault();
+      const prevIdx = currentWordIndex - 1;
+      setCurrentWordIndex(prevIdx);
+      const prevTyped = wordInputs[prevIdx] || "";
+      setUserInput(prevTyped);
+
+      // Reset previous status to pending
+      const nextStatuses = [...wordStatuses];
+      nextStatuses[prevIdx] = "pending";
+      setWordStatuses(nextStatuses);
+    }
   };
 
-  const updateLanguage = (newLanguage: LanguageType) => {
-    setLanguage(newLanguage);
-    PreferencesManager.savePreferences({ language: newLanguage });
+  // Focus container click handler
+  const handleArenaClick = () => {
+    inputRef.current?.focus();
+    setIsFocused(true);
   };
 
-  const updateDifficulty = (newDifficulty: DifficultyType) => {
-    setDifficulty(newDifficulty);
-    PreferencesManager.savePreferences({ difficulty: newDifficulty });
+  // Setting handlers
+  const handleLanguageChange = (newLang: LanguageType) => {
+    setLanguage(newLang);
+    PreferencesManager.savePreferences({ language: newLang });
   };
 
-  const updateContentType = (newContentType: ContentType) => {
-    setContentType(newContentType);
-    PreferencesManager.savePreferences({ contentType: newContentType });
+  const handleDifficultyChange = (newDiff: DifficultyType) => {
+    setDifficulty(newDiff);
+    PreferencesManager.savePreferences({ difficulty: newDiff });
   };
 
-  const updateWordCount = (newWordCount: number) => {
-    setWordCount(newWordCount);
-    PreferencesManager.savePreferences({ wordCount: newWordCount });
+  const handleModeChange = (newMode: ModeType) => {
+    setMode(newMode);
+    PreferencesManager.savePreferences({
+      contentType: newMode === "phrases" ? "phrases" : "words",
+    });
   };
 
-  const updateAvoidRepeats = (newAvoidRepeats: boolean) => {
-    setAvoidRepeats(newAvoidRepeats);
-    PreferencesManager.savePreferences({ avoidRepeats: newAvoidRepeats });
+  const handleWordCountChange = (count: number) => {
+    setWordCount(count);
+    PreferencesManager.savePreferences({ wordCount: count });
   };
 
-  const updateAdaptiveMode = (newAdaptiveMode: boolean) => {
-    setAdaptiveMode(newAdaptiveMode);
-    PreferencesManager.savePreferences({ adaptiveMode: newAdaptiveMode });
+  const cycleSoundSwitch = () => {
+    const sequence: SwitchType[] = ["blue", "brown", "linear", "off"];
+    const nextIdx = (sequence.indexOf(soundSwitch) + 1) % sequence.length;
+    setSoundSwitch(sequence[nextIdx]);
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-primary">TypeFlow</h1>
-          <p className="text-muted-foreground">Master typing in multiple languages</p>
-          <div className="flex justify-center space-x-4 mt-4">
-            <button
-              onClick={() => setShowStats(true)}
-              className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors"
-            >
-              View Statistics
-            </button>
-            <ThemeSelector />
-            <button
-              onClick={clearAllData}
-              className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg hover:bg-destructive/90 transition-colors"
-              title="Clear all saved data"
-            >
-              Clear Data
-            </button>
-          </div>
-        </div>
-
-        {/* Game Controls */}
-        <div className="bg-card border rounded-lg p-6 space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Language</label>
-              <select
-                value={language}
-                onChange={(e) => updateLanguage(e.target.value as LanguageType)}
-                className="w-full p-2 bg-background border rounded-md"
-                disabled={gameState.isActive}
-              >
-                <option value="english">English</option>
-                <option value="vietnamese">Tiếng Việt</option>
-              </select>
+    <div className="min-h-screen bg-background text-foreground flex flex-col justify-between selection:bg-primary/20 selection:text-primary">
+      {/* Top Header Navigation */}
+      <header className="border-b border-border/60 bg-card/40 backdrop-blur-md sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+          {/* Logo & Brand */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs">
+              <Keyboard className="w-5 h-5" />
             </div>
-
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Difficulty
-                {adaptiveMode && <span className="text-xs text-muted-foreground ml-1">(AI will adjust)</span>}
-              </label>
-              <select
-                value={difficulty}
-                onChange={(e) => updateDifficulty(e.target.value as DifficultyType)}
-                className={`w-full p-2 bg-background border rounded-md ${adaptiveMode ? "opacity-75" : ""}`}
-                disabled={gameState.isActive}
-                title={adaptiveMode ? "Base difficulty - AI will adjust automatically" : "Select difficulty level"}
-              >
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Content</label>
-              <select
-                value={contentType}
-                onChange={(e) => updateContentType(e.target.value as ContentType)}
-                className="w-full p-2 bg-background border rounded-md"
-                disabled={gameState.isActive}
-              >
-                <option value="words">Words</option>
-                <option value="phrases">Phrases</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Word Count</label>
-              <select
-                value={wordCount}
-                onChange={(e) => updateWordCount(Number(e.target.value))}
-                className="w-full p-2 bg-background border rounded-md"
-                disabled={gameState.isActive}
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-4">
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={avoidRepeats}
-                onChange={(e) => updateAvoidRepeats(e.target.checked)}
-                disabled={gameState.isActive}
-                className="rounded"
-              />
-              <span className="text-sm">Avoid repeats</span>
-            </label>
-
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={adaptiveMode}
-                onChange={(e) => updateAdaptiveMode(e.target.checked)}
-                disabled={gameState.isActive}
-                className="rounded"
-              />
-              <span className="text-sm">
-                Adaptive mode
-                <span className="text-xs text-muted-foreground block">
-                  {adaptiveMode ? "AI adjusts difficulty automatically" : "Manual difficulty selection"}
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-primary via-primary/90 to-primary/70 bg-clip-text text-transparent">
+                  TypeFlow
                 </span>
-              </span>
-            </label>
-          </div>
-        </div>
-
-        {/* Stats Display */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-card border rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{stats.wpm}</div>
-            <div className="text-sm text-muted-foreground">WPM</div>
-          </div>
-          <div className="bg-card border rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{stats.accuracy}%</div>
-            <div className="text-sm text-muted-foreground">Accuracy</div>
-          </div>
-          <div className="bg-card border rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{Math.round(stats.consistency)}%</div>
-            <div className="text-sm text-muted-foreground">Consistency</div>
-          </div>
-          <div className="bg-card border rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-primary">{Math.round(stats.timeElapsed)}</div>
-            <div className="text-sm text-muted-foreground">Seconds</div>
-          </div>
-        </div>
-
-        {/* Typing Area */}
-        <div className="bg-card border rounded-lg p-6">
-          <div className="text-lg leading-relaxed mb-4 font-mono min-h-[120px] p-4 bg-background rounded-md">
-            {gameState.words.map((word, index) => (
-              <span key={index}>
-                {renderWord(word, index)}
-                {index < gameState.words.length - 1 && " "}
-              </span>
-            ))}
-          </div>
-
-          <input
-            ref={inputRef}
-            type="text"
-            value={gameState.userInput}
-            onChange={handleInput}
-            disabled={gameState.isComplete}
-            className="w-full p-3 bg-background border rounded-md text-lg font-mono focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder={gameState.isComplete ? "Test completed!" : "Start typing..."}
-            autoFocus
-          />
-        </div>
-
-        {/* Adaptive Alert */}
-        {adaptiveAlert && (
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-              <span className="text-blue-400 font-medium">AI Coach:</span>
-              <span className="text-blue-300">{adaptiveAlert}</span>
+                <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded-md bg-primary/15 text-primary">
+                  2.0
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground hidden sm:block">
+                Luyện gõ tiếng Việt & English thông minh
+              </p>
             </div>
           </div>
-        )}
 
-        {/* Language-specific Hints */}
-        {typingHints.length > 0 && (
-          <div className="bg-card border rounded-lg p-4">
-            <h3 className="font-medium mb-2">Typing Tips for {language === "english" ? "English" : "Vietnamese"}:</h3>
-            <ul className="text-sm text-muted-foreground space-y-1">
-              {typingHints.map((hint, index) => (
-                <li key={index}>• {hint}</li>
-              ))}
-            </ul>
+          {/* Quick Stats & Controls */}
+          <div className="flex items-center gap-2">
+            {/* Streak */}
+            {streakInfo && streakInfo.current > 0 && (
+              <Badge
+                variant="outline"
+                className="hidden items-center gap-1 border-warning/30 bg-warning/10 text-warning sm:flex"
+              >
+                <Flame className="size-3.5" aria-hidden />
+                <span className="font-bold">{streakInfo.current} ngày</span>
+              </Badge>
+            )}
+
+            {/* Sound Toggle */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={cycleSoundSwitch}
+              className="h-9 gap-1.5 px-2.5 text-xs font-medium"
+              title={`Âm thanh phím: ${soundSwitch}`}
+              aria-label={`Âm thanh phím: ${soundSwitch}`}
+            >
+              {soundSwitch === "off" ? (
+                <VolumeX className="size-4 text-muted-foreground" aria-hidden />
+              ) : (
+                <Volume2 className="size-4 text-primary" aria-hidden />
+              )}
+              <span className="hidden capitalize md:inline">{soundSwitch}</span>
+            </Button>
+
+            {/* Dashboard */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openDashboard("overview")}
+              className="h-9 gap-1.5 px-2.5 text-xs font-medium"
+            >
+              <BarChart3 className="size-4 text-primary" aria-hidden />
+              <span className="hidden md:inline">Bảng điều khiển</span>
+            </Button>
+
+            {/* Ẩn/hiện bảng phụ (chỉ trên desktop) */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleSidebar}
+              aria-pressed={sidebarOpen}
+              aria-label={sidebarOpen ? "Ẩn bảng phụ" : "Hiện bảng phụ"}
+              title={sidebarOpen ? "Ẩn bảng phụ" : "Hiện bảng phụ"}
+              className="hidden h-9 w-9 px-0 xl:inline-flex"
+            >
+              {sidebarOpen ? (
+                <PanelRightClose className="size-4" aria-hidden />
+              ) : (
+                <PanelRight className="size-4" aria-hidden />
+              )}
+            </Button>
+
+            {/* Theme Selector */}
+            <ThemeSelector />
           </div>
-        )}
+        </div>
+      </header>
 
-        {/* Score Display */}
-        {currentScore && (
-          <div className="bg-card border rounded-lg p-6">
-            <h3 className="text-xl font-bold mb-4 text-center">Final Score</h3>
-            <div className="text-center space-y-2">
-              <div className="text-4xl font-bold text-primary">{currentScore.totalScore}</div>
-              <div className="text-lg text-muted-foreground">
-                Rating: <span className="text-primary font-medium">{currentScore.rating}</span>
+      {/* Main Content Area */}
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+        <div
+          className={`grid gap-5 transition-[grid-template-columns] duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)] ${
+            sidebarOpen ? "xl:grid-cols-[minmax(0,1fr)_300px]" : "xl:grid-cols-[minmax(0,1fr)_0px]"
+          }`}
+        >
+          {/* Vùng gõ luôn căn giữa để giữ tập trung, bất kể sidebar mở hay đóng */}
+          <div className="mx-auto w-full min-w-0 max-w-3xl">
+            {/* Test Result View (When test completed) */}
+            {isComplete && currentScore ? (
+              <TestResult
+                score={currentScore}
+                achievements={newAchievements}
+                wpmHistory={wpmTimeline}
+                onRestart={initializeGame}
+                onRetry={initializeGame}
+                onOpenDashboard={openDashboard}
+              />
+            ) : (
+              /* Active Typing Arena & Controls */
+              <div className="w-full space-y-5 animate-in fade-in duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)]">
+            {/* Pill Navigation Toolbar */}
+            <div className="flex flex-wrap items-center justify-center gap-3 p-2 rounded-2xl bg-card/70 border border-border/80 shadow-xs backdrop-blur-xs">
+              {/* Language Selector */}
+              <div className="flex items-center gap-1 bg-background/80 p-1 rounded-xl border border-border/60">
+                <Globe className="w-3.5 h-3.5 ml-2 text-muted-foreground" />
+                <SegmentedHighlight className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleLanguageChange("english")}
+                    data-segment-active={language === "english"}
+                    className={`relative z-10 px-3 py-1 rounded-lg text-xs font-semibold transition-colors duration-150 ${
+                      language === "english"
+                        ? "text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    English
+                  </button>
+                  <button
+                    onClick={() => handleLanguageChange("vietnamese")}
+                    data-segment-active={language === "vietnamese"}
+                    className={`relative z-10 px-3 py-1 rounded-lg text-xs font-semibold transition-colors duration-150 ${
+                      language === "vietnamese"
+                        ? "text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Tiếng Việt
+                  </button>
+                </SegmentedHighlight>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-sm">
-                <div>Speed: {currentScore.speedScore}</div>
-                <div>Accuracy: {currentScore.accuracyScore}</div>
-                <div>Consistency: {currentScore.consistencyScore}</div>
-                <div>Bonus: {currentScore.bonusScore}</div>
+
+              {/* Mode Selector */}
+              <div className="flex items-center gap-1 bg-background/80 p-1 rounded-xl border border-border/60">
+                <SegmentedHighlight className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleModeChange("words")}
+                    data-segment-active={mode === "words"}
+                    className={`relative z-10 px-3 py-1 rounded-lg text-xs font-semibold transition-colors duration-150 flex items-center gap-1.5 ${
+                      mode === "words"
+                        ? "text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Type className="w-3.5 h-3.5" />
+                    <span>Words</span>
+                  </button>
+                  <button
+                    onClick={() => handleModeChange("time")}
+                    data-segment-active={mode === "time"}
+                    className={`relative z-10 px-3 py-1 rounded-lg text-xs font-semibold transition-colors duration-150 flex items-center gap-1.5 ${
+                      mode === "time"
+                        ? "text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Time</span>
+                  </button>
+                  <button
+                    onClick={() => handleModeChange("phrases")}
+                    data-segment-active={mode === "phrases"}
+                    className={`relative z-10 px-3 py-1 rounded-lg text-xs font-semibold transition-colors duration-150 flex items-center gap-1.5 ${
+                      mode === "phrases"
+                        ? "text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Quote className="w-3.5 h-3.5" />
+                    <span>Phrases</span>
+                  </button>
+                </SegmentedHighlight>
               </div>
+
+              {/* Word Count / Time Limit Options */}
+              <div className="flex items-center gap-1 bg-background/80 p-1 rounded-xl border border-border/60">
+                <SegmentedHighlight className="flex items-center gap-1">
+                  {mode === "time"
+                    ? [15, 30, 60, 120].map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => {
+                            setTimeLimit(t);
+                            initializeGame();
+                          }}
+                          data-segment-active={timeLimit === t}
+                          className={`relative z-10 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors duration-150 ${
+                            timeLimit === t
+                              ? "text-primary-foreground"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {t}s
+                        </button>
+                      ))
+                    : [10, 25, 50, 100].map((cnt) => (
+                        <button
+                          key={cnt}
+                          onClick={() => handleWordCountChange(cnt)}
+                          data-segment-active={wordCount === cnt}
+                          className={`relative z-10 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors duration-150 ${
+                            wordCount === cnt
+                              ? "text-primary-foreground"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {cnt}
+                        </button>
+                      ))}
+                </SegmentedHighlight>
+              </div>
+
+              {/* Difficulty */}
+              <div className="flex items-center gap-1 bg-background/80 p-1 rounded-xl border border-border/60">
+                <Gauge className="w-3.5 h-3.5 ml-2 text-muted-foreground" />
+                <SegmentedHighlight className="flex items-center gap-1">
+                  {(["easy", "medium", "hard"] as DifficultyType[]).map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => handleDifficultyChange(d)}
+                      data-segment-active={difficulty === d}
+                      className={`relative z-10 px-2.5 py-1 rounded-lg text-xs font-semibold capitalize transition-colors duration-150 ${
+                        difficulty === d
+                          ? "text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </SegmentedHighlight>
+              </div>
+
+              {/* Adaptive AI Mode Switch */}
+              <button
+                onClick={() => {
+                  const nextState = !adaptiveMode;
+                  setAdaptiveMode(nextState);
+                  PreferencesManager.savePreferences({ adaptiveMode: nextState });
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                  adaptiveMode
+                    ? "bg-primary/10 border-primary/30 text-primary"
+                    : "bg-background/80 border-border/60 text-muted-foreground hover:text-foreground"
+                }`}
+                title="Tự động điều chỉnh độ khó và huấn luyện viên thời gian thực"
+              >
+                <Sparkle className={`w-3.5 h-3.5 ${adaptiveMode ? "animate-spin text-primary" : ""}`} />
+                <span>AI Adaptive</span>
+              </button>
             </div>
-          </div>
-        )}
 
-        {/* Achievements */}
-        {newAchievements.length > 0 && (
-          <div className="bg-card border rounded-lg p-6">
-            <h3 className="text-xl font-bold mb-4 text-center">New Achievements! 🎉</h3>
-            <div className="space-y-2">
-              {newAchievements.map((achievement, index) => (
-                <div
-                  key={index}
-                  className="flex items-center space-x-3 p-3 bg-primary/10 rounded-md"
-                >
-                  <span className="text-2xl">{achievement.icon}</span>
-                  <div>
-                    <div className="font-medium">{achievement.name}</div>
-                    <div className="text-sm text-muted-foreground">{achievement.description}</div>
+            {/* Live Stats HUD (Realtime) */}
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+              <StatTile label="WPM" value={liveStats.wpm} tone="primary" />
+              <StatTile label="Chính xác" value={`${liveStats.accuracy}%`} />
+              <StatTile
+                label={mode === "time" ? "Còn lại" : "Tiến độ"}
+                value={mode === "time" ? `${timeLeft}s` : `${currentWordIndex}/${words.length}`}
+              />
+              <StatTile label="Độ ổn định" value={`${Math.round(liveStats.consistency)}%`} />
+            </div>
+
+            {/* AI Real-time Coach Alert Toast */}
+            {adaptiveAlert && (
+              <div
+                data-state={alertLeaving ? "closed" : "open"}
+                className="mx-auto flex max-w-md items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/12 p-3 text-xs font-medium text-primary animate-in fade-in slide-in-from-top-1 duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-1"
+              >
+                <Brain className="size-4 shrink-0" aria-hidden />
+                <span>{adaptiveAlert}</span>
+              </div>
+            )}
+
+            {/* Typing Arena Box */}
+            <div
+              onClick={handleArenaClick}
+              className={`relative rounded-3xl bg-card/90 border-2 transition-all duration-200 p-8 shadow-md cursor-text select-none min-h-[190px] flex items-center ${
+                isFocused
+                  ? "border-primary/60 shadow-primary/5 ring-4 ring-primary/10"
+                  : "border-border hover:border-border/80"
+              }`}
+            >
+              {/* Unfocused overlay prompt */}
+              {!isFocused && !isActive && (
+                <div className="absolute inset-0 bg-background/50 backdrop-blur-[1px] rounded-3xl flex items-center justify-center z-20 animate-in fade-in zoom-in-95 duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)]">
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-card border shadow-sm text-sm font-semibold text-muted-foreground">
+                    <Keyboard className="w-4 h-4 text-primary" />
+                    <span>Nhấp chuột hoặc gõ bất kỳ phím nào để bắt đầu</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              )}
 
-        {/* Reset Button */}
-        <div className="text-center">
-          <button
-            onClick={resetGame}
-            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-          >
-            {gameState.isComplete ? "Start New Test" : "Reset Test"}
-          </button>
+              {/* Text Container with smooth auto-scroll */}
+              <div
+                ref={wordsContainerRef}
+                className="w-full max-h-[140px] overflow-hidden text-2xl md:text-3xl font-mono leading-relaxed tracking-wide flex flex-wrap gap-x-3 gap-y-2 relative"
+              >
+                {words.map((word, wordIdx) => {
+                  const isCurrent = wordIdx === currentWordIndex;
+                  const isPast = wordIdx < currentWordIndex;
+                  const status = wordStatuses[wordIdx];
+
+                  return (
+                    <span
+                      key={wordIdx}
+                      ref={isCurrent ? activeWordRef : null}
+                      className={`relative inline-block transition-colors duration-100 ${
+                        isCurrent
+                          ? "text-foreground font-medium"
+                          : isPast
+                          ? status === "correct"
+                            ? "text-muted-foreground/80 animate-word-settle"
+                            : "text-destructive/90 underline decoration-destructive decoration-wavy underline-offset-4"
+                          : "text-muted-foreground/35"
+                      }`}
+                    >
+                      {isCurrent ? (
+                        // Render active word with character by character highlighting
+                        <>
+                          {word.split("").map((char, charIdx) => {
+                            const isTyped = charIdx < userInput.length;
+                            const isCorrect = isTyped && userInput[charIdx] === char;
+                            const isMistake = isTyped && userInput[charIdx] !== char;
+                            const isCaretHere = charIdx === userInput.length;
+                            // Chỉ ký tự vừa gõ (cuối cùng đã gõ) mới nhận feedback động.
+                            const isJustTyped = isTyped && charIdx === userInput.length - 1;
+
+                            return (
+                              <span
+                                key={charIdx}
+                                ref={isCaretHere ? activeCharRef : null}
+                                className={`relative inline-block ${
+                                  isCorrect
+                                    ? "text-primary font-semibold"
+                                    : isMistake
+                                    ? "text-destructive bg-destructive/15 rounded-xs underline decoration-destructive"
+                                    : "text-muted-foreground/60"
+                                } ${
+                                  isJustTyped
+                                    ? isCorrect
+                                      ? "animate-char-pop"
+                                      : "animate-char-shake"
+                                    : ""
+                                }`}
+                              >
+                                {isCaretHere && (
+                                  <span
+                                    aria-hidden
+                                    className="absolute -left-[1px] top-0 bottom-0 w-[2.5px] bg-primary rounded-full caret-smooth"
+                                  />
+                                )}
+                                {char}
+                              </span>
+                            );
+                          })}
+
+                          {/* Extra characters typed beyond target word */}
+                          {userInput.length > word.length &&
+                            userInput
+                              .slice(word.length)
+                              .split("")
+                              .map((extraChar, extraIdx) => (
+                                <span
+                                  key={`extra-${extraIdx}`}
+                                  className="text-destructive bg-destructive/25 rounded-xs"
+                                >
+                                  {extraChar}
+                                </span>
+                              ))}
+
+                          {/* Caret at end of word */}
+                          {userInput.length >= word.length && (
+                            <span
+                              aria-hidden
+                              className="inline-block w-[2.5px] h-[1em] bg-primary rounded-full align-middle ml-[1px] caret-smooth"
+                            />
+                          )}
+                        </>
+                      ) : (
+                        word
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+
+              {/* Hidden text input capturing keystrokes and IME */}
+              <input
+                ref={inputRef}
+                type="text"
+                value={userInput}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                className="absolute opacity-0 pointer-events-none w-0 h-0"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+              />
+            </div>
+
+            {/* Restart & Action Controls */}
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={initializeGame}
+                className="gap-2 px-6 rounded-xl hover:bg-primary hover:text-primary-foreground transition-all shadow-xs"
+                title="Bắt đầu lại (Tab + Enter hoặc Esc)"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Bắt đầu lại</span>
+                <kbd className="text-[10px] bg-muted px-1.5 py-0.5 rounded border font-mono">
+                  Esc
+                </kbd>
+              </Button>
+            </div>
+              </div>
+            )}
+          </div>
+
+          {sidebarOpen ? (
+            <aside className="hidden xl:sticky xl:top-20 xl:block xl:self-start animate-in fade-in slide-in-from-right-2 duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)]">
+              <PracticeSidebar
+                streakInfo={streakInfo}
+                recentSessions={recentSessions}
+                onOpenDashboard={openDashboard}
+              />
+            </aside>
+          ) : null}
         </div>
 
-        {/* Statistics Dashboard */}
-        <StatisticsDashboard
-          isOpen={showStats}
-          onClose={() => setShowStats(false)}
-        />
-      </div>
+        {/* Màn hình nhỏ: các thẻ phụ xuống dưới khu gõ */}
+        <div className="mt-6 xl:hidden">
+          <PracticeSidebar
+            streakInfo={streakInfo}
+            recentSessions={recentSessions}
+            onOpenDashboard={openDashboard}
+            layout="grid"
+          />
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-border/40 py-5 text-xs text-muted-foreground">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 text-center sm:flex-row sm:text-left">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <span className="font-semibold text-foreground">TypeFlow</span>
+            <span aria-hidden>·</span>
+            <span>Phím tắt</span>
+            <kbd className="rounded border border-border/70 bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+              Tab + Enter / Esc
+            </kbd>
+            <span>để thử lại</span>
+          </div>
+          <div>
+            <span>Hỗ trợ bộ gõ Telex / VNI và tiếng Anh chuẩn quốc tế</span>
+          </div>
+        </div>
+      </footer>
+
+      <Dashboard
+        open={dashboardOpen}
+        onOpenChange={setDashboardOpen}
+        initialTab={dashboardTab}
+        score={currentScore ?? undefined}
+        newAchievements={newAchievements}
+      />
     </div>
   );
 }

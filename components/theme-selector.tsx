@@ -1,28 +1,33 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
+import { Check, Palette } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
+  DialogBody,
   DialogContent,
-  DialogDescription,
+  DialogFooter,
   DialogHeader,
-  DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Palette, Check } from "lucide-react"
-import { themeManager, THEMES, type ThemeId, type Theme } from "@/lib/themes"
+import { themeManager, THEMES, type Theme, type ThemeId } from "@/lib/themes"
 import { PreferencesManager } from "@/lib/preferences"
+import { cn } from "@/lib/utils"
 
-interface ThemeSelectorProps {
-  className?: string
-}
+const CATEGORIES = [
+  { id: "minimalist", name: "Tối giản", description: "Sạch sẽ, tập trung vào nội dung" },
+  { id: "nature", name: "Thiên nhiên", description: "Tông màu dịu, lấy cảm hứng từ tự nhiên" },
+  { id: "dark", name: "Tối", description: "Dịu mắt khi luyện buổi tối" },
+  { id: "accessibility", name: "Dễ tiếp cận", description: "Tương phản cao, dễ đọc" },
+  { id: "retro", name: "Cổ điển", description: "Không khí máy tính thập niên trước" },
+] as const
 
-export function ThemeSelector({ className }: ThemeSelectorProps) {
-  const [currentTheme, setCurrentTheme] = useState<Theme>(themeManager.getCurrentTheme())
+export function ThemeSelector({ className }: { className?: string }) {
+  // Render đầu tiên dùng theme mặc định để khớp HTML từ server; theme đã lưu
+  // được áp trong useEffect bên dưới.
+  const [currentTheme, setCurrentTheme] = useState<Theme>(THEMES.forest_green)
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
@@ -32,6 +37,8 @@ export function ThemeSelector({ className }: ThemeSelectorProps) {
     }
 
     themeManager.initialize()
+    setCurrentTheme(themeManager.getCurrentTheme())
+
     const unsubscribe = themeManager.subscribe(setCurrentTheme)
     return unsubscribe
   }, [])
@@ -42,175 +49,128 @@ export function ThemeSelector({ className }: ThemeSelectorProps) {
     setIsOpen(false)
   }
 
-  const categories = [
-    { id: "minimalist", name: "Minimalist", description: "Clean and focused" },
-    { id: "nature", name: "Nature", description: "Inspired by natural elements" },
-    { id: "dark", name: "Dark", description: "Easy on the eyes" },
-    { id: "accessibility", name: "Accessibility", description: "High contrast and readable" },
-    { id: "retro", name: "Retro", description: "Classic computing aesthetics" },
-  ] as const
-
   return (
     <div className={className}>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-            <Palette className="h-4 w-4" />
-            {currentTheme.name}
+          <Button variant="outline" size="sm" className="gap-1.5">
+            <Palette className="size-4 text-primary" aria-hidden />
+            <span className="hidden md:inline">{currentTheme.name}</span>
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Choose Your Theme</DialogTitle>
-            <DialogDescription>Select a theme that matches your typing style and preferences</DialogDescription>
-          </DialogHeader>
 
-          <div className="space-y-6">
-            {categories.map((category) => {
-              const categoryThemes = themeManager.getThemesByCategory(category.id)
-              if (categoryThemes.length === 0) return null
+        <DialogContent size="xl">
+          <DialogHeader
+            icon={Palette}
+            title="Giao diện"
+            description="Chọn bảng màu phù hợp với không gian và thói quen luyện gõ của bạn"
+          />
 
-              return (
-                <div key={category.id}>
-                  <div className="mb-3">
-                    <h3 className="text-lg font-semibold">{category.name}</h3>
-                    <p className="text-sm text-muted-foreground">{category.description}</p>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {categoryThemes.map((theme) => (
-                      <ThemePreviewCard
-                        key={theme.id}
-                        theme={theme}
-                        isSelected={currentTheme.id === theme.id}
-                        onSelect={() => handleThemeChange(theme.id as ThemeId)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <DialogBody>
+            <div className="space-y-5">
+              {CATEGORIES.map((category) => {
+                const themes = themeManager.getThemesByCategory(category.id)
+                if (themes.length === 0) return null
+
+                return (
+                  <section key={category.id}>
+                    <div className="mb-2">
+                      <h3 className="text-sm font-semibold">{category.name}</h3>
+                      <p className="text-[11.5px] text-muted-foreground">{category.description}</p>
+                    </div>
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-2.5">
+                      {themes.map((theme) => (
+                        <ThemeCard
+                          key={theme.id}
+                          theme={theme}
+                          selected={currentTheme.id === theme.id}
+                          onSelect={() => handleThemeChange(theme.id as ThemeId)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )
+              })}
+            </div>
+          </DialogBody>
+
+          <DialogFooter>
+            <p className="mr-auto text-[11px] text-muted-foreground">
+              Đang dùng: <span className="font-semibold text-foreground">{currentTheme.name}</span>
+            </p>
+            <Button size="sm" onClick={() => setIsOpen(false)}>
+              Đóng
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   )
 }
 
-interface ThemePreviewCardProps {
+function ThemeCard({
+  theme,
+  selected,
+  onSelect,
+}: {
   theme: Theme
-  isSelected: boolean
+  selected: boolean
   onSelect: () => void
-}
-
-function ThemePreviewCard({ theme, isSelected, onSelect }: ThemePreviewCardProps) {
+}) {
   return (
-    <Card
-      className={`relative cursor-pointer transition-all duration-200 hover:scale-105 ${
-        isSelected ? "ring-2 ring-primary" : ""
-      }`}
+    <button
+      type="button"
       onClick={onSelect}
-    >
-      {isSelected && (
-        <div className="absolute top-2 right-2 z-10">
-          <div className="bg-primary text-primary-foreground rounded-full p-1">
-            <Check className="h-3 w-3" />
-          </div>
-        </div>
+      aria-pressed={selected}
+      className={cn(
+        "group relative flex w-full flex-col gap-2 rounded-xl border p-3 text-left transition-[transform,box-shadow,border-color,background-color] duration-150 ease-[cubic-bezier(0.2,0.9,0.4,1)] hover:-translate-y-0.5 hover:shadow-sm",
+        "focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none",
+        selected
+          ? "border-primary/50 bg-primary/5 ring-1 ring-primary/30"
+          : "border-border/70 bg-background/40 hover:border-border hover:bg-muted/30"
       )}
+    >
+      {selected ? (
+        <span className="absolute top-2 right-2 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground">
+          <Check className="size-3" aria-hidden />
+        </span>
+      ) : null}
 
-      <div className="p-4">
-        <div className="mb-3">
-          <h4 className="font-medium">{theme.name}</h4>
-          <p className="text-xs text-muted-foreground">{theme.description}</p>
-        </div>
-
-        {/* Color Preview */}
-        <div className="mb-3">
-          <div className="flex gap-1 mb-2">
-            <div
-              className="w-4 h-4 rounded-full border"
-              style={{ backgroundColor: theme.colors.background }}
-              title="Background"
-            />
-            <div
-              className="w-4 h-4 rounded-full border"
-              style={{ backgroundColor: theme.colors.primary }}
-              title="Primary"
-            />
-            <div
-              className="w-4 h-4 rounded-full border"
-              style={{ backgroundColor: theme.colors.secondary }}
-              title="Secondary"
-            />
-            <div
-              className="w-4 h-4 rounded-full border"
-              style={{ backgroundColor: theme.colors.accent }}
-              title="Accent"
-            />
-          </div>
-        </div>
-
-        {/* Mini Preview */}
-        <div
-          className="text-xs p-2 rounded border"
-          style={{
-            backgroundColor: theme.colors.background,
-            color: theme.colors.foreground,
-            borderColor: theme.colors.border,
-          }}
-        >
-          <div className="mb-1">
-            <span style={{ color: theme.colors.primary }}>The quick</span>{" "}
-            <span style={{ color: theme.colors.foreground }}>brown fox</span>
-          </div>
-          <div
-            className="text-xs px-1 rounded"
-            style={{
-              backgroundColor: theme.colors.muted,
-              color: theme.colors.mutedForeground,
-            }}
-          >
-            WPM: 65 | Accuracy: 98%
-          </div>
-        </div>
-
-        <Badge variant="outline" className="mt-2 text-xs">
-          {theme.category}
-        </Badge>
+      <div>
+        <p className="text-xs font-semibold">{theme.name}</p>
+        <p className="mt-0.5 line-clamp-1 text-[10.5px] text-muted-foreground">{theme.description}</p>
       </div>
-    </Card>
-  )
-}
 
-// Simple theme selector for quick access
-export function QuickThemeSelector({ className }: ThemeSelectorProps) {
-  const [currentTheme, setCurrentTheme] = useState<Theme>(themeManager.getCurrentTheme())
+      <div className="flex gap-1">
+        {[theme.colors.background, theme.colors.primary, theme.colors.secondary, theme.colors.accent].map(
+          (color, index) => (
+            <span
+              key={`${theme.id}-${index}`}
+              className="size-3.5 rounded-full border border-black/10"
+              style={{ backgroundColor: color }}
+            />
+          )
+        )}
+      </div>
 
-  useEffect(() => {
-    const unsubscribe = themeManager.subscribe(setCurrentTheme)
-    return unsubscribe
-  }, [])
-
-  const handleThemeChange = (themeId: string) => {
-    themeManager.setTheme(themeId as ThemeId)
-    PreferencesManager.savePreferences({ theme: themeId })
-  }
-
-  return (
-    <Select value={currentTheme.id} onValueChange={handleThemeChange}>
-      <SelectTrigger className={className}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {Object.values(THEMES).map((theme) => (
-          <SelectItem key={theme.id} value={theme.id}>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full border" style={{ backgroundColor: theme.colors.primary }} />
-              {theme.name}
-            </div>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+      <div
+        className="rounded-lg border p-2"
+        style={{
+          backgroundColor: theme.colors.background,
+          borderColor: theme.colors.border,
+          color: theme.colors.foreground,
+        }}
+      >
+        <p className="text-[10.5px] leading-snug">
+          <span style={{ color: theme.colors.primary }}>The quick</span> brown fox
+        </p>
+        <p
+          className="mt-1 rounded px-1.5 py-0.5 text-[9.5px]"
+          style={{ backgroundColor: theme.colors.muted, color: theme.colors.mutedForeground }}
+        >
+          WPM 65 · 98%
+        </p>
+      </div>
+    </button>
   )
 }

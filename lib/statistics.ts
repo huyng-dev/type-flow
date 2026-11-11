@@ -44,6 +44,23 @@ export interface LanguageStats {
   improvementRate: number;
 }
 
+export interface ProgressPoint {
+  /** Khoá ngày theo giờ địa phương, dạng YYYY-MM-DD. */
+  date: string;
+  /** WPM trung bình ngày đó; `null` nếu không luyện. */
+  wpm: number | null;
+  accuracy: number | null;
+  sessions: number;
+}
+
+/** Khoá ngày theo giờ địa phương (không dùng toISOString vì sẽ lệch múi giờ). */
+function toDateKey(timestamp: number): string {
+  const date = new Date(timestamp);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 export class StatisticsManager {
   private static readonly STORAGE_KEY = "typeflow-statistics";
   private static readonly MAX_SESSIONS = 1000;
@@ -200,25 +217,51 @@ export class StatisticsManager {
     });
   }
 
-  static getProgressData(days = 30): Array<{ date: string; wpm: number; accuracy: number }> {
-    const sessions = this.getRecentSessions(days);
-    const dailyData = sessions.reduce((acc, session) => {
-      const date = new Date(session.timestamp).toISOString().split("T")[0];
-      if (!acc[date]) {
-        acc[date] = { wpm: [], accuracy: [] };
-      }
-      acc[date].wpm.push(session.wpm);
-      acc[date].accuracy.push(session.accuracy);
-      return acc;
-    }, {} as Record<string, { wpm: number[]; accuracy: number[] }>);
+  /**
+   * Chuỗi tiến bộ cho đúng khoảng thời gian đã chọn.
+   *
+   * Trả về ĐỦ `days` điểm, mỗi ngày một điểm; ngày không luyện có `wpm = null`
+   * để biểu đồ giữ đúng trục thời gian. Trước đây hàm chỉ trả về những ngày
+   * có phiên, nên khi dữ liệu chỉ nằm trong vài ngày gần nhất thì mọi mốc
+   * 7 / 30 / 90 / 365 ngày đều cho ra cùng một mảng — biểu đồ trông như
+   * "không đổi" dù người dùng bấm mốc khác.
+   */
+  static getProgressData(days = 30): ProgressPoint[] {
+    const span = Math.max(1, Math.floor(days));
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - (span - 1));
 
-    return Object.entries(dailyData)
-      .map(([date, data]) => ({
-        date,
-        wpm: Math.round(data.wpm.reduce((sum, w) => sum + w, 0) / data.wpm.length),
-        accuracy: Math.round(data.accuracy.reduce((sum, a) => sum + a, 0) / data.accuracy.length),
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    const buckets = new Map<string, { wpm: number[]; accuracy: number[] }>();
+
+    for (const session of this.getAllSessions()) {
+      if (session.timestamp < start.getTime()) continue;
+      const key = toDateKey(session.timestamp);
+      const bucket = buckets.get(key) ?? { wpm: [], accuracy: [] };
+      bucket.wpm.push(session.wpm);
+      bucket.accuracy.push(session.accuracy);
+      buckets.set(key, bucket);
+    }
+
+    return Array.from({ length: span }, (_, index) => {
+      const day = new Date(start);
+      day.setDate(start.getDate() + index);
+      const key = toDateKey(day.getTime());
+      const bucket = buckets.get(key);
+
+      if (!bucket || bucket.wpm.length === 0) {
+        return { date: key, wpm: null, accuracy: null, sessions: 0 };
+      }
+
+      return {
+        date: key,
+        wpm: Math.round(bucket.wpm.reduce((sum, value) => sum + value, 0) / bucket.wpm.length),
+        accuracy: Math.round(
+          bucket.accuracy.reduce((sum, value) => sum + value, 0) / bucket.accuracy.length
+        ),
+        sessions: bucket.wpm.length,
+      };
+    });
   }
 
   private static calculateStreaks(sessions: GameSession[]): { currentStreak: number; longestStreak: number } {

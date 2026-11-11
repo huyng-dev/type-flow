@@ -1,3 +1,18 @@
+export interface PersonalBests {
+  highestScore: ScoreEntry | null;
+  fastestWpm: ScoreEntry | null;
+  bestAccuracy: ScoreEntry | null;
+  longestSession: ScoreEntry | null;
+}
+
+export interface AchievementStats {
+  total: number;
+  unlocked: number;
+  points: number;
+  byCategory: Record<string, { total: number; unlocked: number }>;
+  recent: Achievement[];
+}
+
 export interface ScoreBreakdown {
   baseScore: number;
   speedBonus: number;
@@ -11,24 +26,54 @@ export interface ScoreBreakdown {
   totalScore: number;
 }
 
+export interface StatsForAchievement {
+  wpm: number;
+  accuracy: number;
+  consistency: number;
+  totalSessions: number;
+  languagesUsed: number;
+  longestStreak: number;
+  hasNightSession: boolean;
+  hasEarlySession: boolean;
+  [key: string]: unknown;
+}
+
+/** Khoá biểu tượng (không dùng emoji trong giao diện nữa). */
+export type AchievementIcon =
+  | "zap"
+  | "rocket"
+  | "target"
+  | "gem"
+  | "activity"
+  | "star"
+  | "footprints"
+  | "book"
+  | "trophy"
+  | "languages"
+  | "flame"
+  | "moon"
+  | "sunrise";
+
 export interface Achievement {
   id: string;
   name: string;
   description: string;
-  icon: string;
+  icon: AchievementIcon;
   category: "speed" | "accuracy" | "consistency" | "milestone" | "special";
-  requirement: (stats: any) => boolean;
+  requirement: (stats: StatsForAchievement) => boolean;
   points: number;
   rarity: "common" | "rare" | "epic" | "legendary";
   unlockedAt?: number;
 }
+
+export type RatingTone = "primary" | "success" | "warning" | "destructive" | "info" | "muted";
 
 export interface PerformanceRating {
   overall: "F" | "D" | "C" | "B" | "A" | "S" | "SS" | "SSS";
   speed: "F" | "D" | "C" | "B" | "A" | "S";
   accuracy: "F" | "D" | "C" | "B" | "A" | "S";
   consistency: "F" | "D" | "C" | "B" | "A" | "S";
-  color: string;
+  tone: RatingTone;
   description: string;
 }
 
@@ -39,6 +84,7 @@ export interface ScoreEntry {
   breakdown: ScoreBreakdown;
   wpm: number;
   accuracy: number;
+  consistency: number;
   language: string;
   difficulty: string;
   contentType: string;
@@ -64,9 +110,9 @@ const ACHIEVEMENTS: Achievement[] = [
   // Speed Achievements
   {
     id: "speed_demon_25",
-    name: "Speed Demon",
-    description: "Reach 25 WPM",
-    icon: "⚡",
+    name: "Tia chớp",
+    description: "Đạt 25 WPM",
+    icon: "zap",
     category: "speed",
     requirement: (stats) => stats.wpm >= 25,
     points: 100,
@@ -74,9 +120,9 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: "speed_demon_50",
-    name: "Lightning Fingers",
-    description: "Reach 50 WPM",
-    icon: "⚡",
+    name: "Ngón tay thần tốc",
+    description: "Đạt 50 WPM",
+    icon: "zap",
     category: "speed",
     requirement: (stats) => stats.wpm >= 50,
     points: 250,
@@ -84,9 +130,9 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: "speed_demon_75",
-    name: "Velocity Master",
-    description: "Reach 75 WPM",
-    icon: "🚀",
+    name: "Bậc thầy tốc độ",
+    description: "Đạt 75 WPM",
+    icon: "rocket",
     category: "speed",
     requirement: (stats) => stats.wpm >= 75,
     points: 500,
@@ -94,9 +140,9 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: "speed_demon_100",
-    name: "Supersonic Typist",
-    description: "Reach 100 WPM",
-    icon: "🚀",
+    name: "Gõ siêu thanh",
+    description: "Đạt 100 WPM",
+    icon: "rocket",
     category: "speed",
     requirement: (stats) => stats.wpm >= 100,
     points: 1000,
@@ -106,9 +152,9 @@ const ACHIEVEMENTS: Achievement[] = [
   // Accuracy Achievements
   {
     id: "accuracy_95",
-    name: "Precision Typist",
-    description: "Achieve 95% accuracy",
-    icon: "🎯",
+    name: "Chuẩn từng phím",
+    description: "Đạt độ chính xác 95%",
+    icon: "target",
     category: "accuracy",
     requirement: (stats) => stats.accuracy >= 95,
     points: 150,
@@ -116,9 +162,9 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: "accuracy_98",
-    name: "Near Perfect",
-    description: "Achieve 98% accuracy",
-    icon: "🎯",
+    name: "Gần như hoàn hảo",
+    description: "Đạt độ chính xác 98%",
+    icon: "target",
     category: "accuracy",
     requirement: (stats) => stats.accuracy >= 98,
     points: 300,
@@ -126,9 +172,9 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: "accuracy_100",
-    name: "Flawless Victory",
-    description: "Achieve 100% accuracy",
-    icon: "💎",
+    name: "Không một lỗi",
+    description: "Đạt độ chính xác 100%",
+    icon: "gem",
     category: "accuracy",
     requirement: (stats) => stats.accuracy === 100,
     points: 750,
@@ -138,9 +184,9 @@ const ACHIEVEMENTS: Achievement[] = [
   // Consistency Achievements
   {
     id: "consistency_master",
-    name: "Steady Hands",
-    description: "Maintain consistent speed throughout session",
-    icon: "📊",
+    name: "Nhịp gõ đều tay",
+    description: "Giữ tốc độ ổn định suốt phiên",
+    icon: "activity",
     category: "consistency",
     requirement: (stats) => stats.consistency >= 85,
     points: 200,
@@ -150,9 +196,9 @@ const ACHIEVEMENTS: Achievement[] = [
   // Milestone Achievements
   {
     id: "first_session",
-    name: "First Steps",
-    description: "Complete your first typing session",
-    icon: "🌟",
+    name: "Bước đầu tiên",
+    description: "Hoàn thành phiên gõ đầu tiên",
+    icon: "star",
     category: "milestone",
     requirement: (stats) => stats.totalSessions >= 1,
     points: 50,
@@ -160,9 +206,9 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: "sessions_10",
-    name: "Getting Started",
-    description: "Complete 10 typing sessions",
-    icon: "🏃",
+    name: "Khởi động",
+    description: "Hoàn thành 10 phiên gõ",
+    icon: "footprints",
     category: "milestone",
     requirement: (stats) => stats.totalSessions >= 10,
     points: 200,
@@ -170,9 +216,9 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: "sessions_50",
-    name: "Dedicated Learner",
-    description: "Complete 50 typing sessions",
-    icon: "📚",
+    name: "Bền bỉ",
+    description: "Hoàn thành 50 phiên gõ",
+    icon: "book",
     category: "milestone",
     requirement: (stats) => stats.totalSessions >= 50,
     points: 500,
@@ -180,9 +226,9 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: "sessions_100",
-    name: "Typing Enthusiast",
-    description: "Complete 100 typing sessions",
-    icon: "🏆",
+    name: "Đam mê gõ phím",
+    description: "Hoàn thành 100 phiên gõ",
+    icon: "trophy",
     category: "milestone",
     requirement: (stats) => stats.totalSessions >= 100,
     points: 1000,
@@ -192,9 +238,9 @@ const ACHIEVEMENTS: Achievement[] = [
   // Special Achievements
   {
     id: "multilingual",
-    name: "Polyglot Typist",
-    description: "Practice in multiple languages",
-    icon: "🌍",
+    name: "Đa ngôn ngữ",
+    description: "Luyện tập với nhiều ngôn ngữ",
+    icon: "languages",
     category: "special",
     requirement: (stats) => stats.languagesUsed >= 2,
     points: 300,
@@ -202,9 +248,9 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: "streak_7",
-    name: "Week Warrior",
-    description: "Maintain a 7-day typing streak",
-    icon: "🔥",
+    name: "Chiến binh 7 ngày",
+    description: "Giữ chuỗi 7 ngày liên tiếp",
+    icon: "flame",
     category: "special",
     requirement: (stats) => stats.longestStreak >= 7,
     points: 400,
@@ -212,9 +258,9 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: "streak_30",
-    name: "Monthly Master",
-    description: "Maintain a 30-day typing streak",
-    icon: "🔥",
+    name: "Bậc thầy 30 ngày",
+    description: "Giữ chuỗi 30 ngày liên tiếp",
+    icon: "flame",
     category: "special",
     requirement: (stats) => stats.longestStreak >= 30,
     points: 1500,
@@ -222,9 +268,9 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: "night_owl",
-    name: "Night Owl",
-    description: "Practice typing after midnight",
-    icon: "🦉",
+    name: "Cú đêm",
+    description: "Luyện gõ sau nửa đêm",
+    icon: "moon",
     category: "special",
     requirement: (stats) => stats.hasNightSession,
     points: 100,
@@ -232,9 +278,9 @@ const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: "early_bird",
-    name: "Early Bird",
-    description: "Practice typing before 6 AM",
-    icon: "🐦",
+    name: "Chim sớm",
+    description: "Luyện gõ trước 6 giờ sáng",
+    icon: "sunrise",
     category: "special",
     requirement: (stats) => stats.hasEarlySession,
     points: 100,
@@ -269,7 +315,7 @@ export class ScoringSystem {
     perfectWords: number;
     totalWords: number;
   }): ScoreBreakdown {
-    const { wpm, accuracy, consistency, language, difficulty, contentType, wordCount, timeElapsed, perfectWords, totalWords } = sessionData;
+    const { wpm, accuracy, consistency, language, difficulty, timeElapsed, perfectWords, totalWords } = sessionData;
 
     // Base score from WPM and accuracy
     const baseScore = Math.round(wpm * (accuracy / 100) * 10);
@@ -339,41 +385,41 @@ export class ScoringSystem {
     const avgRating = (ratings[speedRating] + ratings[accuracyRating] + ratings[consistencyRating]) / 3;
 
     let overall: PerformanceRating["overall"];
-    let color: string;
+    let tone: RatingTone;
     let description: string;
 
     if (avgRating >= 4.5 && wpm >= 100 && accuracy >= 99) {
       overall = "SSS";
-      color = "text-purple-500";
-      description = "Legendary Performance";
+      tone = "primary";
+      description = "Đẳng cấp huyền thoại";
     } else if (avgRating >= 4.5 && wpm >= 80 && accuracy >= 98) {
       overall = "SS";
-      color = "text-yellow-500";
-      description = "Outstanding Performance";
+      tone = "warning";
+      description = "Xuất sắc vượt trội";
     } else if (avgRating >= 4) {
       overall = "S";
-      color = "text-green-500";
-      description = "Excellent Performance";
+      tone = "success";
+      description = "Rất tốt";
     } else if (avgRating >= 3) {
       overall = "A";
-      color = "text-blue-500";
-      description = "Great Performance";
+      tone = "info";
+      description = "Tốt";
     } else if (avgRating >= 2.5) {
       overall = "B";
-      color = "text-cyan-500";
-      description = "Good Performance";
+      tone = "info";
+      description = "Khá";
     } else if (avgRating >= 2) {
       overall = "C";
-      color = "text-orange-500";
-      description = "Fair Performance";
+      tone = "warning";
+      description = "Trung bình";
     } else if (avgRating >= 1) {
       overall = "D";
-      color = "text-red-500";
-      description = "Needs Improvement";
+      tone = "destructive";
+      description = "Cần cải thiện";
     } else {
       overall = "F";
-      color = "text-gray-500";
-      description = "Keep Practicing";
+      tone = "muted";
+      description = "Hãy luyện thêm";
     }
 
     return {
@@ -381,25 +427,34 @@ export class ScoringSystem {
       speed: speedRating,
       accuracy: accuracyRating,
       consistency: consistencyRating,
-      color,
+      tone,
       description,
     };
   }
 
   // Check for new achievements
-  checkAchievements(sessionData: any, userStats: any): Achievement[] {
+  checkAchievements(
+    sessionData: Partial<StatsForAchievement>,
+    userStats: Partial<StatsForAchievement>
+  ): Achievement[] {
     const newAchievements: Achievement[] = [];
+
+    const currentHour = new Date().getHours();
+    const combinedStats: StatsForAchievement = {
+      wpm: 0,
+      accuracy: 0,
+      consistency: 0,
+      totalSessions: 0,
+      languagesUsed: 1,
+      longestStreak: this.streakData.longest,
+      hasNightSession: currentHour >= 0 && currentHour < 6,
+      hasEarlySession: currentHour >= 4 && currentHour < 6,
+      ...userStats,
+      ...sessionData,
+    };
 
     for (const achievement of ACHIEVEMENTS) {
       if (!this.unlockedAchievements.has(achievement.id)) {
-        const combinedStats = { ...sessionData, ...userStats };
-
-        // Add special stats for time-based achievements
-        const currentHour = new Date().getHours();
-        combinedStats.hasNightSession = currentHour >= 0 && currentHour < 6;
-        combinedStats.hasEarlySession = currentHour >= 4 && currentHour < 6;
-        combinedStats.longestStreak = this.streakData.longest;
-
         if (achievement.requirement(combinedStats)) {
           this.unlockedAchievements.add(achievement.id);
           achievement.unlockedAt = Date.now();
@@ -446,7 +501,7 @@ export class ScoringSystem {
       perfectWords: number;
       totalWords: number;
     },
-    userStats: any
+    userStats: Partial<StatsForAchievement>
   ): { scoreEntry: ScoreEntry; newAchievements: Achievement[] } {
     this.updateStreak();
 
@@ -461,6 +516,7 @@ export class ScoringSystem {
       breakdown,
       wpm: sessionData.wpm,
       accuracy: sessionData.accuracy,
+      consistency: sessionData.consistency,
       language: sessionData.language,
       difficulty: sessionData.difficulty,
       contentType: sessionData.contentType,

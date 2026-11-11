@@ -6,19 +6,21 @@ export interface UserPreferences {
   wordCount: number;
   avoidRepeats: boolean;
   adaptiveMode: boolean;
+  sidebarOpen: boolean;
 }
 
 export class PreferencesManager {
   private static readonly STORAGE_KEY = "typeflow-preferences";
 
   private static readonly DEFAULT_PREFERENCES: UserPreferences = {
-    theme: "forest-green",
+    theme: "forest_green",
     language: "english",
     difficulty: "medium",
     contentType: "words",
     wordCount: 25,
     avoidRepeats: true,
     adaptiveMode: true,
+    sidebarOpen: true,
   };
 
   // Fallback storage when localStorage is not available (SSR / tests)

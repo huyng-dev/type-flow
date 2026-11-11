@@ -10,8 +10,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "TypeFlow",
-  description: "Master typing in English and Vietnamese with adaptive learning",
+  title: "TypeFlow — Luyện gõ tiếng Việt & English",
+  description: "Luyện gõ phím thông minh với lộ trình thích ứng cho tiếng Việt và tiếng Anh",
 };
 
 export default function RootLayout({
@@ -21,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="vi"
       className={inter.variable}
     >
       <body className="font-sans antialiased">{children}</body>

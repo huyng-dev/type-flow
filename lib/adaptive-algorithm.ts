@@ -1,3 +1,20 @@
+export interface PerformanceTrends {
+  wpmTrend: "improving" | "declining" | "stable";
+  accuracyTrend: "improving" | "declining" | "stable";
+  consistencyTrend: "improving" | "declining" | "stable";
+  overallProgress: number;
+}
+
+export interface AdaptiveStats {
+  totalSessions: number;
+  totalTimeMinutes: number;
+  averageWpm: number;
+  averageAccuracy: number;
+  bestWpm: number;
+  bestAccuracy: number;
+  improvementRate: number;
+}
+
 export interface PerformanceMetrics {
   wpm: number;
   accuracy: number;
@@ -195,11 +212,11 @@ export class AdaptiveAlgorithm {
   }
 
   // Get adaptive word selection weights
-  getWordSelectionWeights(language: string): Record<string, number> {
+  getWordSelectionWeights(language?: string): Record<string, number> {
     const weights: Record<string, number> = {};
-
-    // Base weights for difficulty progression
-    const skillAssessment = this.assessSkill();
+    if (language) {
+      // Reserved for language-specific adaptive weighting
+    }
 
     // Adjust weights based on user's weak areas
     if (this.performanceHistory.length > 0) {
@@ -454,7 +471,6 @@ export class AdaptiveAlgorithm {
 
   getRealtimeFeedback(currentPerformance: { wpm: number; accuracy: number; consistency: number }): string | null {
     const settings = this.getAdaptiveSettings();
-    const skillAssessment = this.assessSkill();
 
     // Provide feedback based on current performance vs targets
     if (currentPerformance.accuracy < 85) {
@@ -556,7 +572,7 @@ export class AdaptiveAlgorithm {
       achievements.push({
         name: "Speed Demon",
         description: "Achieved 60+ WPM",
-        icon: "⚡",
+        icon: "zap",
       });
     }
 
@@ -564,7 +580,7 @@ export class AdaptiveAlgorithm {
       achievements.push({
         name: "Perfectionist",
         description: "Achieved 98%+ accuracy",
-        icon: "🎯",
+        icon: "target",
       });
     }
 
@@ -572,7 +588,7 @@ export class AdaptiveAlgorithm {
       achievements.push({
         name: "Flawless",
         description: "90%+ perfect words",
-        icon: "💎",
+        icon: "gem",
       });
     }
 
@@ -580,7 +596,7 @@ export class AdaptiveAlgorithm {
       achievements.push({
         name: "Vietnamese Master",
         description: "40+ WPM in Vietnamese",
-        icon: "🇻🇳",
+        icon: "languages",
       });
     }
 

@@ -21,6 +21,12 @@
   --accent-foreground: oklch(0.98 0.01 142);
   --destructive: oklch(0.55 0.22 25);
   --destructive-foreground: oklch(0.98 0.01 142);
+  --success: oklch(0.52 0.14 150);
+  --success-foreground: oklch(0.99 0.01 150);
+  --warning: oklch(0.62 0.14 65);
+  --warning-foreground: oklch(0.2 0.04 65);
+  --info: oklch(0.55 0.12 250);
+  --info-foreground: oklch(0.99 0.01 250);
   --border: oklch(0.88 0.03 142);
   --input: oklch(0.96 0.02 142);
   --ring: oklch(0.35 0.12 142 / 0.4);
@@ -57,6 +63,12 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -116,13 +128,110 @@
   box-shadow: 0 0 0 1px currentColor, inset 0 0 0 1px currentColor;
 }
 
-/* Smooth transitions for theme changes */
-* {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+/* ---------------------------------------------------------------------------
+   Motion system
+   Ngân sách: UI <= 250ms, easing thống nhất. Chỉ transform + opacity trên
+   đường keystroke (xem .perch/plans/animation-upgrade.md).
+--------------------------------------------------------------------------- */
+
+:root {
+  --ease-out-soft: cubic-bezier(0.2, 0.9, 0.4, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --duration-celebrate: 400ms;
+}
+
+@keyframes caretBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Caret: chỉ animate transform, không animate left/top (tránh layout thrash). */
+.caret-smooth {
+  animation: caretBlink 1s ease-in-out infinite;
+  transition: transform var(--duration-fast) var(--ease-out-soft);
+  will-change: transform;
+}
+
+/* Ký tự vừa gõ đúng: nhích nhẹ, không đổi layout. */
+@keyframes charPop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.animate-char-pop {
+  animation: charPop var(--duration-fast) var(--ease-out-soft) 1;
+}
+
+/* Ký tự gõ sai: rung biên độ nhỏ, một lần, chỉ trên ký tự mới nhất. */
+@keyframes charShake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  25% { transform: translate3d(-2px, 0, 0); }
+  75% { transform: translate3d(2px, 0, 0); }
+}
+
+.animate-char-shake {
+  animation: charShake 140ms var(--ease-out-soft) 1;
+}
+
+/* Từ vừa hoàn thành: lắng xuống, không nhảy. */
+@keyframes wordSettle {
+  0% { transform: translate3d(0, 0, 0); opacity: 1; }
+  100% { transform: translate3d(0, 0, 0); opacity: 0.8; }
+}
+
+.animate-word-settle {
+  animation: wordSettle 160ms var(--ease-out-soft) 1 forwards;
+}
+
+/* Huy hiệu legendary: một nhịp sáng rất nhẹ, không loop. */
+@keyframes legendaryPulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--warning) 45%, transparent); }
+  100% { box-shadow: 0 0 0 8px transparent; }
+}
+
+.animate-legendary-pulse {
+  animation: legendaryPulse 800ms var(--ease-out-soft) 1;
+}
+
+/* Sparkline: vẽ dần bằng stroke-dashoffset, chạy một lần khi mount. */
+@keyframes sparkDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Crossfade khi đổi theme: gắn tạm vào <html> trong ~300ms.
+   Chỉ áp cho thuộc tính màu, không đụng layout. */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow !important;
+  transition-duration: 250ms !important;
+  transition-timing-function: ease !important;
+}
+
+/* Tôn trọng lựa chọn giảm chuyển động của hệ điều hành. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .caret-smooth {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 /* Background patterns support */
 body {
   background-attachment: fixed;
   background-size: cover;
+  min-height: 100vh;
 }
