@@ -210,6 +210,7 @@ class SoundManager {
       if (!this.audioCtx) return;
 
       const normalized = this.normalizeSwitch(this.currentSwitch);
+      if (normalized === "off") return;
       const pack = this.soundPacks[normalized];
 
       // NẾU SOUND PACK ĐÃ TẢI XONG: PHÁT ÂM THANH PHÍM CƠ THẬT
