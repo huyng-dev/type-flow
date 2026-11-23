@@ -140,6 +140,7 @@ export default function TypingGame() {
   const sessionBonusXpRef = useRef<number>(0);
   const levelUpTimerRef = useRef<number | null>(null);
   const isComposingRef = useRef<boolean>(false);
+  const currentSessionDifficultyRef = useRef<DifficultyType>("medium");
 
   // Streak & lịch sử gần đây (chỉ đọc localStorage khi cần, không đọc mỗi lần gõ phím)
   const [streakInfo, setStreakInfo] = useState<StreakData | null>(null);
@@ -312,6 +313,8 @@ export default function TypingGame() {
       effectiveDifficulty = assessment.recommendedDifficulty;
       wordWeights = adaptiveAlgorithm.getWordSelectionWeights();
     }
+
+    currentSessionDifficultyRef.current = effectiveDifficulty;
 
     const countToGenerate = mode === "time" ? 100 : wordCount;
     const contentType: ContentType = mode === "phrases" ? "phrases" : "words";
@@ -523,13 +526,16 @@ export default function TypingGame() {
       );
       setFinalStats(computed);
 
+      // Độ khó thực tế của bài gõ vừa hoàn thành (theo AI hoặc thủ công)
+      const sessionDifficulty = currentSessionDifficultyRef.current || (adaptiveMode ? aiDifficulty : difficulty);
+
       // Score record
       const sessionData = {
         wpm: computed.wpm,
         accuracy: computed.accuracy,
         consistency: computed.consistency,
         language,
-        difficulty,
+        difficulty: sessionDifficulty,
         contentType: mode,
         wordCount: finalWordIdx,
         timeElapsed: elapsedSec,
@@ -552,7 +558,7 @@ export default function TypingGame() {
         id: scoreEntry.id,
         timestamp: scoreEntry.timestamp,
         language,
-        difficulty,
+        difficulty: sessionDifficulty,
         contentType: mode,
         wordCount: finalWordIdx,
         wpm: computed.wpm,
@@ -598,7 +604,7 @@ export default function TypingGame() {
           wpm: computed.wpm,
           accuracy: computed.accuracy,
           consistency: computed.consistency,
-          difficulty: adaptiveMode ? aiDifficulty : difficulty,
+          difficulty: sessionDifficulty,
           language,
           contentType: mode,
           wordCount: finalWordIdx,
@@ -1054,6 +1060,7 @@ export default function TypingGame() {
   };
 
   const handleDifficultyChange = (newDiff: DifficultyType) => {
+    currentSessionDifficultyRef.current = newDiff;
     setDifficulty(newDiff);
     PreferencesManager.savePreferences({ difficulty: newDiff });
     // Nếu đang bật adaptiveMode, chuyển về chế độ thủ công khi người dùng click chọn độ khó
