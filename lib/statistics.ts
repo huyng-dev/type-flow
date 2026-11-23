@@ -320,16 +320,79 @@ export class StatisticsManager {
 
   static exportData(): string {
     const sessions = this.getAllSessions();
-    return JSON.stringify(sessions, null, 2);
+    if (typeof window === "undefined" || !window.localStorage) {
+      return JSON.stringify(sessions, null, 2);
+    }
+
+    const safeParse = (key: string) => {
+      try {
+        const val = localStorage.getItem(key);
+        return val ? JSON.parse(val) : undefined;
+      } catch {
+        return undefined;
+      }
+    };
+
+    const backup = {
+      version: 2,
+      app: "typeflow",
+      exportedAt: new Date().toISOString(),
+      sessions,
+      scores: safeParse("typeflow-scores"),
+      achievements: safeParse("typeflow-achievements"),
+      streak: safeParse("typeflow-streak"),
+      engagement: safeParse("typeflow-engagement-v1"),
+      performance: safeParse("typeflow-performance"),
+      adaptiveSettings: safeParse("typeflow-settings"),
+      preferences: safeParse("typeflow-preferences"),
+      theme: localStorage.getItem("typeflow-theme") || undefined,
+    };
+
+    return JSON.stringify(backup, null, 2);
   }
 
   static importData(jsonData: string): boolean {
+    if (typeof window === "undefined" || !window.localStorage) return false;
     try {
-      const sessions = JSON.parse(jsonData) as GameSession[];
-      if (Array.isArray(sessions)) {
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(sessions));
+      const parsed = JSON.parse(jsonData);
+
+      // Định dạng cũ: mảng session
+      if (Array.isArray(parsed)) {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(parsed));
         return true;
       }
+
+      // Định dạng backup đầy đủ (v2) hoặc object có sessions
+      if (parsed && typeof parsed === "object") {
+        let hasImported = false;
+
+        if (Array.isArray(parsed.sessions)) {
+          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(parsed.sessions));
+          hasImported = true;
+        }
+
+        const restoreKey = (key: string, value: unknown) => {
+          if (value !== undefined) {
+            localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value));
+            hasImported = true;
+          }
+        };
+
+        restoreKey("typeflow-scores", parsed.scores);
+        restoreKey("typeflow-achievements", parsed.achievements);
+        restoreKey("typeflow-streak", parsed.streak);
+        restoreKey("typeflow-engagement-v1", parsed.engagement);
+        restoreKey("typeflow-performance", parsed.performance);
+        restoreKey("typeflow-settings", parsed.adaptiveSettings);
+        restoreKey("typeflow-preferences", parsed.preferences);
+        if (typeof parsed.theme === "string") {
+          localStorage.setItem("typeflow-theme", parsed.theme);
+          hasImported = true;
+        }
+
+        return hasImported;
+      }
+
       return false;
     } catch {
       return false;

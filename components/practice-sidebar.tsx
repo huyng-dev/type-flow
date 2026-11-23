@@ -2,7 +2,9 @@
 
 import { ChevronRight, Flame } from "lucide-react"
 
+import { DailyQuests } from "@/components/daily-quests"
 import type { DashboardTab } from "@/components/dashboard/data"
+import type { EngagementSnapshot } from "@/lib/engagement"
 import type { GameSession } from "@/lib/statistics"
 import type { StreakData } from "@/lib/scoring-system"
 
@@ -11,6 +13,8 @@ interface PracticeSidebarProps {
   recentSessions: GameSession[]
   onOpenDashboard: (tab: DashboardTab) => void
   layout?: "stack" | "grid"
+  engagement?: EngagementSnapshot | null
+  onClaimQuest?: (id: string) => void
 }
 
 /**
@@ -22,6 +26,8 @@ export function PracticeSidebar({
   recentSessions,
   onOpenDashboard,
   layout = "stack",
+  engagement = null,
+  onClaimQuest,
 }: PracticeSidebarProps) {
   const card = "rounded-2xl border border-border/70 bg-card/60 p-4"
 
@@ -42,6 +48,10 @@ export function PracticeSidebar({
           Dài nhất {streakInfo?.longest ?? 0} ngày · hệ số ×{streakInfo?.multiplier ?? 1}
         </p>
       </section>
+
+      {onClaimQuest ? (
+        <DailyQuests snapshot={engagement} onClaim={onClaimQuest} />
+      ) : null}
 
       <section className={card}>
         <div className="flex items-center justify-between">

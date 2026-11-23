@@ -12,6 +12,22 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "TypeFlow — Luyện gõ tiếng Việt & English",
   description: "Luyện gõ phím thông minh với lộ trình thích ứng cho tiếng Việt và tiếng Anh",
+  icons: {
+    icon: [
+      {
+        url: "/favicon-light.svg",
+        media: "(prefers-color-scheme: light)",
+        type: "image/svg+xml",
+      },
+      {
+        url: "/favicon-dark.svg",
+        media: "(prefers-color-scheme: dark)",
+        type: "image/svg+xml",
+      },
+    ],
+    shortcut: "/favicon.svg",
+    apple: "/favicon-dark.svg",
+  },
 };
 
 export default function RootLayout({

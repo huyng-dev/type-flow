@@ -53,7 +53,11 @@ export function ThemeSelector({ className }: { className?: string }) {
     <div className={className}>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 rounded-lg border-border/70 px-2.5 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+          >
             <Palette className="size-4 text-primary" aria-hidden />
             <span className="hidden md:inline">{currentTheme.name}</span>
           </Button>

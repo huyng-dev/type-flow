@@ -5,9 +5,14 @@ import { ThemeSelector } from "@/components/theme-selector";
 import { PracticeSidebar } from "@/components/practice-sidebar";
 import { Dashboard } from "@/components/dashboard";
 import type { DashboardTab } from "@/components/dashboard/data";
-import { TestResult } from "@/components/test-result";
+import { TestResult, type TestResultExtras } from "@/components/test-result";
 import { StatTile } from "@/components/data-display";
 import { SegmentedHighlight } from "@/components/ui/segmented";
+import { ComboMeter } from "@/components/combo-meter";
+import { DopamineControl } from "@/components/dopamine-control";
+import { FeedbackLayer } from "@/components/feedback-layer";
+import { getLogoIcon, type LogoConcept } from "@/components/logo";
+import { LogoPreviewDialog } from "@/components/logo-preview-dialog";
 
 import { PreferencesManager } from "@/lib/preferences";
 import { adaptiveAlgorithm } from "@/lib/adaptive-algorithm";
@@ -20,6 +25,16 @@ import {
 } from "@/lib/scoring-system";
 import { StatisticsManager, type GameSession } from "@/lib/statistics";
 import { soundManager, type SwitchType } from "@/lib/audio";
+import {
+  buildGoldenFlags,
+  comboMultiplier,
+  comboTier,
+  feedbackEngine,
+  rollWordReward,
+  type DopamineMode,
+} from "@/lib/dopamine";
+import { EngagementManager, type EngagementSnapshot } from "@/lib/engagement";
+import { useReducedMotion } from "@/lib/motion";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +54,7 @@ import {
   Quote,
   PanelRight,
   PanelRightClose,
+  Coffee,
 } from "lucide-react";
 
 type ModeType = "words" | "time" | "phrases";
@@ -63,6 +79,9 @@ export default function TypingGame() {
   const [soundSwitch, setSoundSwitch] = useState<SwitchType>("blue");
   const [avoidRepeats, setAvoidRepeats] = useState<boolean>(true);
   const [adaptiveMode, setAdaptiveMode] = useState<boolean>(true);
+
+  // Độ khó thực tế do AI đề xuất khi bật adaptiveMode
+  const aiDifficulty = adaptiveMode ? adaptiveAlgorithm.assessSkill().recommendedDifficulty : difficulty;
 
   // Active Game State
   const [words, setWords] = useState<string[]>([]);
@@ -93,6 +112,19 @@ export default function TypingGame() {
   const [dashboardTab, setDashboardTab] = useState<DashboardTab>("overview");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
 
+  // DPM Mode — lớp phản hồi thưởng
+  const [dopamineMode, setDopamineMode] = useState<DopamineMode>("balanced");
+  const [effectsVolume, setEffectsVolume] = useState<number>(0.6);
+  const [haptics, setHaptics] = useState<boolean>(false);
+  const [wellbeingNudges, setWellbeingNudges] = useState<boolean>(true);
+  const [dopaminePromptSeen, setDopaminePromptSeen] = useState<boolean>(true);
+  const [combo, setCombo] = useState<number>(0);
+  const [goldenFlags, setGoldenFlags] = useState<boolean[]>([]);
+  const [engagement, setEngagement] = useState<EngagementSnapshot | null>(null);
+  const [resultExtras, setResultExtras] = useState<TestResultExtras | null>(null);
+  const [breakNudge, setBreakNudge] = useState<boolean>(false);
+  const reducedMotion = useReducedMotion();
+
   // Refs
   const inputRef = useRef<HTMLInputElement>(null);
   const wordsContainerRef = useRef<HTMLDivElement>(null);
@@ -100,10 +132,33 @@ export default function TypingGame() {
   const activeWordRef = useRef<HTMLSpanElement>(null);
   const statsRef = useRef<GameStats | null>(null);
   const timeUpHandledRef = useRef<boolean>(false);
+  const comboRef = useRef<number>(0);
+  const bestComboRef = useRef<number>(0);
+  const recordBaselineRef = useRef<number | null>(null);
+  const recordNudgedRef = useRef<boolean>(false);
+  const lastCountdownRef = useRef<number>(0);
+  const sessionBonusXpRef = useRef<number>(0);
+  const levelUpTimerRef = useRef<number | null>(null);
+  const isComposingRef = useRef<boolean>(false);
 
   // Streak & lịch sử gần đây (chỉ đọc localStorage khi cần, không đọc mỗi lần gõ phím)
   const [streakInfo, setStreakInfo] = useState<StreakData | null>(null);
   const [recentSessions, setRecentSessions] = useState<GameSession[]>([]);
+  const [logoConcept, setLogoConcept] = useState<LogoConcept>("1-isometric");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("typeflow-logo-concept");
+      if (saved) setLogoConcept(saved as LogoConcept);
+    }
+  }, []);
+
+  const handleSelectLogoConcept = useCallback((concept: LogoConcept) => {
+    setLogoConcept(concept);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("typeflow-logo-concept", String(concept));
+    }
+  }, []);
 
   const openDashboard = useCallback((tab: DashboardTab = "overview") => {
     setDashboardTab(tab);
@@ -117,17 +172,145 @@ export default function TypingGame() {
     });
   }, []);
 
+  const refreshEngagement = useCallback(() => {
+    setEngagement(EngagementManager.getSnapshot());
+  }, []);
+
+  /** Rung nhẹ trên mobile — chỉ khi DPM bật và người dùng đã đồng ý. */
+  const vibrate = useCallback(
+    (pattern: number | number[]) => {
+      if (dopamineMode === "off" || !haptics) return;
+      if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
+      try {
+        navigator.vibrate(pattern);
+      } catch {
+        // Thiết bị chặn rung: bỏ qua.
+      }
+    },
+    [dopamineMode, haptics]
+  );
+
+  /**
+   * Cập nhật combo và chỉ phát hiệu ứng khi vừa vượt một bậc mới.
+   * Dùng ref để nhiều lần gõ trong cùng một frame vẫn nhất quán.
+   */
+  const commitCombo = useCallback(
+    (next: number) => {
+      const safe = Math.max(0, next);
+      const previousTier = comboTier(comboRef.current);
+      comboRef.current = safe;
+      bestComboRef.current = Math.max(bestComboRef.current, safe);
+      setCombo(safe);
+
+      const nextTier = comboTier(safe);
+      if (nextTier > previousTier && nextTier > 0) {
+        const tier = nextTier as 1 | 2 | 3 | 4;
+        feedbackEngine.emit({
+          kind: "combo",
+          tier,
+          combo: safe,
+          multiplier: comboMultiplier(safe),
+        });
+        if (dopamineMode !== "off") soundManager.playCombo(tier);
+        vibrate(tier >= 3 ? [24, 40, 24, 40, 40] : [18, 30, 18]);
+        EngagementManager.recordBestCombo(safe);
+        if (tier >= 2) refreshEngagement();
+      }
+    },
+    [dopamineMode, refreshEngagement, vibrate]
+  );
+
+  const handleDopamineModeChange = useCallback((mode: DopamineMode) => {
+    setDopamineMode(mode);
+    setDopaminePromptSeen(true);
+    PreferencesManager.savePreferences({ dopamineMode: mode, dopaminePromptSeen: true });
+    if (mode === "off") feedbackEngine.clear();
+  }, []);
+
+  const handleDopaminePromptAction = useCallback(
+    (action: "dismiss" | DopamineMode) => {
+      if (action === "dismiss") {
+        setDopaminePromptSeen(true);
+        PreferencesManager.savePreferences({ dopaminePromptSeen: true });
+        return;
+      }
+      handleDopamineModeChange(action);
+    },
+    [handleDopamineModeChange]
+  );
+
+  const handleEffectsVolumeChange = useCallback((volume: number) => {
+    setEffectsVolume(volume);
+    PreferencesManager.savePreferences({ effectsVolume: volume });
+  }, []);
+
+  const handleHapticsChange = useCallback((enabled: boolean) => {
+    setHaptics(enabled);
+    PreferencesManager.savePreferences({ haptics: enabled });
+  }, []);
+
+  const handleWellbeingChange = useCallback((enabled: boolean) => {
+    setWellbeingNudges(enabled);
+    PreferencesManager.savePreferences({ wellbeingNudges: enabled });
+    if (!enabled) setBreakNudge(false);
+  }, []);
+
+  const handleResetEngagement = useCallback(() => {
+    EngagementManager.reset();
+    feedbackEngine.clear();
+    comboRef.current = 0;
+    bestComboRef.current = 0;
+    setCombo(0);
+    setResultExtras(null);
+    setEngagement(EngagementManager.getSnapshot());
+  }, []);
+
+  const handleClaimQuest = useCallback(
+    (id: string) => {
+      const claimed = EngagementManager.claimQuest(id);
+      if (!claimed) return;
+
+      setEngagement(claimed.snapshot);
+      feedbackEngine.emit({ kind: "quest", label: claimed.label, xp: claimed.reward });
+      if (dopamineMode !== "off") soundManager.playReward("rare");
+      vibrate(20);
+
+      if (claimed.levelUp) {
+        feedbackEngine.emit({
+          kind: "level-up",
+          level: claimed.level,
+          title: claimed.levelTitle,
+        });
+        if (dopamineMode !== "off") soundManager.playLevelUp();
+      }
+    },
+    [dopamineMode, vibrate]
+  );
+
+  useEffect(() => {
+    feedbackEngine.configure({ mode: dopamineMode, reduced: reducedMotion });
+    if (dopamineMode === "off") feedbackEngine.clear();
+  }, [dopamineMode, reducedMotion]);
+
+  useEffect(() => {
+    soundManager.setEffectsVolume(effectsVolume);
+  }, [effectsVolume]);
+
   useEffect(() => {
     setStreakInfo(scoringSystem.getStreakInfo());
     setRecentSessions(StatisticsManager.getRecentSessions(7).slice(0, 3));
-  }, [isComplete]);
+    refreshEngagement();
+  }, [isComplete, refreshEngagement]);
 
   // Generate words
   const generateWordsList = useCallback(() => {
     let effectiveDifficulty = difficulty;
+    let wordWeights: Record<string, number> | undefined;
+
     if (adaptiveMode) {
       const assessment = adaptiveAlgorithm.assessSkill();
       effectiveDifficulty = assessment.recommendedDifficulty;
+      wordWeights = adaptiveAlgorithm.getWordSelectionWeights();
     }
 
     const countToGenerate = mode === "time" ? 100 : wordCount;
@@ -139,19 +322,20 @@ export default function TypingGame() {
       contentType,
       count: countToGenerate,
       avoidRepeats,
+      wordWeights,
     });
 
     return generated;
   }, [language, difficulty, mode, wordCount, avoidRepeats, adaptiveMode]);
 
-  // Initialize or Reset test
-  const initializeGame = useCallback(() => {
-    const newWords = generateWordsList();
-    setWords(newWords);
+  // Reset toàn bộ trạng thái phiên gõ theo danh sách từ mục tiêu
+  const resetSessionState = useCallback((targetWords: string[]) => {
+    setWords(targetWords);
+    setGoldenFlags(buildGoldenFlags(targetWords.length));
     setCurrentWordIndex(0);
     setUserInput("");
-    setWordStatuses(new Array(newWords.length).fill("pending"));
-    setWordInputs(new Array(newWords.length).fill(""));
+    setWordStatuses(new Array(targetWords.length).fill("pending"));
+    setWordInputs(new Array(targetWords.length).fill(""));
     setIsActive(false);
     setIsComplete(false);
     setStartTime(null);
@@ -164,10 +348,21 @@ export default function TypingGame() {
     setCurrentScore(null);
     setNewAchievements([]);
     setAdaptiveAlert(null);
+    setResultExtras(null);
 
-    if (adaptiveMode) {
-      adaptiveAlgorithm.startSession(language, difficulty, mode === "phrases" ? "phrases" : "words", wordCount);
+    // Reset trạng thái DPM của phiên mới
+    comboRef.current = 0;
+    bestComboRef.current = 0;
+    setCombo(0);
+    recordBaselineRef.current = scoringSystem.getPersonalBests().fastestWpm?.wpm ?? null;
+    recordNudgedRef.current = false;
+    lastCountdownRef.current = 0;
+    sessionBonusXpRef.current = 0;
+    if (levelUpTimerRef.current !== null) {
+      window.clearTimeout(levelUpTimerRef.current);
+      levelUpTimerRef.current = null;
     }
+    feedbackEngine.clear();
 
     // Scroll word container back to top
     if (wordsContainerRef.current) {
@@ -178,7 +373,22 @@ export default function TypingGame() {
     setTimeout(() => {
       inputRef.current?.focus();
     }, 50);
-  }, [generateWordsList, adaptiveMode, language, difficulty, mode, wordCount]);
+  }, []);
+
+  // Bài tiếp theo (sinh bộ từ mới)
+  const initializeGame = useCallback(() => {
+    const newWords = generateWordsList();
+    resetSessionState(newWords);
+  }, [generateWordsList, resetSessionState]);
+
+  // Thử lại bài này (giữ nguyên danh sách từ vừa gõ)
+  const retrySameGame = useCallback(() => {
+    if (words.length > 0) {
+      resetSessionState([...words]);
+    } else {
+      initializeGame();
+    }
+  }, [words, resetSessionState, initializeGame]);
 
   // Initialize on mount or when key settings change
   useEffect(() => {
@@ -201,7 +411,21 @@ export default function TypingGame() {
     setAvoidRepeats(saved.avoidRepeats ?? true);
     setAdaptiveMode(saved.adaptiveMode ?? true);
     setSidebarOpen(saved.sidebarOpen ?? true);
-  }, []);
+    setDopamineMode(saved.dopamineMode ?? "balanced");
+    setEffectsVolume(saved.effectsVolume ?? 0.6);
+    setHaptics(saved.haptics ?? false);
+    setWellbeingNudges(saved.wellbeingNudges ?? true);
+    setDopaminePromptSeen(saved.dopaminePromptSeen ?? false);
+    if (saved.soundSwitch) {
+      setSoundSwitch((saved.soundSwitch === "linear" ? "red" : saved.soundSwitch) as SwitchType);
+    }
+    soundManager.setEffectsVolume(saved.effectsVolume ?? 0.6);
+    recordBaselineRef.current = scoringSystem.getPersonalBests().fastestWpm?.wpm ?? null;
+    refreshEngagement();
+    if ((saved.wellbeingNudges ?? true) && EngagementManager.getSnapshot().shouldNudgeBreak) {
+      setBreakNudge(true);
+    }
+  }, [refreshEngagement]);
 
   // Calculate stats helper
   const calculateCurrentStats = useCallback(
@@ -311,14 +535,13 @@ export default function TypingGame() {
         timeElapsed: elapsedSec,
         perfectWords: perfectWordsCount,
         totalWords: Math.max(finalWordIdx, 1),
+        bestCombo: bestComboRef.current,
       };
 
-      const userSummary = StatisticsManager.calculateSummary();
-      const langStats = StatisticsManager.getLanguageStats();
-
+      // Huy hiệu: thống kê được tính từ lịch sử + chính phiên này bên trong
+      // ScoringSystem, nên không còn lệch một phiên như trước.
       const { scoreEntry, newAchievements: unlocked } = scoringSystem.recordScore(sessionData, {
-        ...userSummary,
-        languagesUsed: langStats.length,
+        goldenWords: EngagementManager.getSnapshot().goldenWords,
       });
 
       setCurrentScore(scoreEntry);
@@ -347,27 +570,120 @@ export default function TypingGame() {
 
       // Adaptive algorithm record
       if (adaptiveMode) {
+        // Thu thập từ sai và lỗi gõ thực tế
+        const weakWords: Record<string, number> = {};
+        const strongWords: Record<string, number> = {};
+        const commonErrors: Record<string, number> = {};
+
+        for (let i = 0; i < finalWordIdx; i++) {
+          const target = words[i];
+          const typed = wordInputs[i] || "";
+          if (wordStatuses[i] === "incorrect" || (typed && typed !== target)) {
+            weakWords[target] = (weakWords[target] || 0) + 1;
+            const minLen = Math.min(target.length, typed.length);
+            for (let c = 0; c < minLen; c++) {
+              if (target[c] !== typed[c]) {
+                const pair = `${target[c]}->${typed[c]}`;
+                commonErrors[pair] = (commonErrors[pair] || 0) + 1;
+              }
+            }
+          } else if (wordStatuses[i] === "correct" && typed === target) {
+            strongWords[target] = (strongWords[target] || 0) + 1;
+          }
+        }
+
+        const sessionDurationMinutes = Math.max(0.05, Math.round((elapsedSec / 60) * 100) / 100);
+
         adaptiveAlgorithm.recordPerformance({
           wpm: computed.wpm,
           accuracy: computed.accuracy,
           consistency: computed.consistency,
-          difficulty,
+          difficulty: adaptiveMode ? aiDifficulty : difficulty,
           language,
           contentType: mode,
           wordCount: finalWordIdx,
-          errorPatterns: [],
+          sessionLength: sessionDurationMinutes,
+          weakWords,
+          strongWords,
+          commonErrors,
           timestamp: Date.now(),
         });
+      }
+
+      // Động lực: XP, level, kỷ lục combo
+      const recordBaseline = recordBaselineRef.current;
+      const recordDelta =
+        recordBaseline !== null && computed.wpm > recordBaseline
+          ? computed.wpm - recordBaseline
+          : null;
+      const outcome = EngagementManager.recordSession({
+        score: scoreEntry.score,
+        bestCombo: bestComboRef.current,
+        bonusXp: sessionBonusXpRef.current,
+      });
+
+      setResultExtras({
+        sessionXp: outcome.sessionXp,
+        level: outcome.level,
+        levelTitle: outcome.levelTitle,
+        levelProgress: outcome.levelProgress,
+        xpIntoLevel: outcome.snapshot.xpIntoLevel,
+        xpForNext: outcome.snapshot.xpForNext,
+        bestCombo: bestComboRef.current,
+        recordDelta,
+        levelUp: outcome.levelUp,
+      });
+      refreshEngagement();
+
+      if (dopamineMode !== "off") {
+        feedbackEngine.emit({ kind: "finish" });
+
+        if (unlocked.length > 0) {
+          const rank = { common: 0, rare: 1, epic: 2, legendary: 3 } as const;
+          const top = unlocked.reduce(
+            (best, item) => (rank[item.rarity] > rank[best.rarity] ? item : best),
+            unlocked[0]
+          );
+          feedbackEngine.emit({
+            kind: "achievement",
+            name: unlocked.length === 1 ? unlocked[0].name : `${unlocked.length} huy hiệu mới`,
+            rarity: top.rarity,
+            points: unlocked.reduce((sum, item) => sum + item.points, 0),
+          });
+          soundManager.playReward(top.rarity === "common" ? "rare" : "epic");
+          vibrate(top.rarity === "legendary" ? [20, 40, 20, 40, 50] : 20);
+        }
+
+        if (recordDelta) soundManager.playRecord();
+        if (outcome.levelUp) {
+          levelUpTimerRef.current = window.setTimeout(() => {
+            feedbackEngine.emit({
+              kind: "level-up",
+              level: outcome.level,
+              title: outcome.levelTitle,
+            });
+            soundManager.playLevelUp();
+            levelUpTimerRef.current = null;
+          }, 450);
+        }
+        vibrate(recordDelta ? [24, 40, 24, 40, 60] : 24);
       }
     },
     [
       calculateCurrentStats,
       language,
       difficulty,
+      aiDifficulty,
       mode,
       perfectWordsCount,
       errorCount,
       adaptiveMode,
+      dopamineMode,
+      refreshEngagement,
+      vibrate,
+      words,
+      wordInputs,
+      wordStatuses,
     ]
   );
 
@@ -421,11 +737,20 @@ export default function TypingGame() {
     const snapshot = statsRef.current;
     if (!snapshot) return;
 
-    const feedback = adaptiveAlgorithm.getRealtimeFeedback({
-      wpm: snapshot.wpm,
-      accuracy: snapshot.accuracy,
-      consistency: snapshot.consistency,
-    });
+    const currentWord = words[currentWordIndex];
+    const isCurrentError = userInput.length > 0 && !currentWord?.startsWith(userInput);
+
+    const feedback = adaptiveAlgorithm.getRealtimeFeedback(
+      {
+        wpm: snapshot.wpm,
+        accuracy: snapshot.accuracy,
+        consistency: snapshot.consistency,
+      },
+      {
+        currentWord,
+        isError: isCurrentError,
+      }
+    );
 
     if (feedback) {
       setAdaptiveAlert(feedback);
@@ -440,7 +765,7 @@ export default function TypingGame() {
       }, 3000);
       return () => clearTimeout(timeout);
     }
-  }, [elapsedSeconds, adaptiveMode, isActive, isComplete]);
+  }, [elapsedSeconds, adaptiveMode, isActive, isComplete, currentWordIndex, userInput, words]);
 
   // Hết giờ ở chế độ đếm ngược
   useEffect(() => {
@@ -464,6 +789,49 @@ export default function TypingGame() {
     finishGame,
   ]);
 
+  // "Sắp phá kỷ lục" / "Vượt kỷ lục" — chỉ một lần mỗi phiên.
+  useEffect(() => {
+    if (!isActive || isComplete || dopamineMode === "off" || reducedMotion) return;
+    if (elapsedSeconds < 6 || recordNudgedRef.current) return;
+
+    const baseline = recordBaselineRef.current;
+    if (!baseline) return;
+    const current = statsRef.current?.wpm ?? 0;
+
+    if (current >= baseline) {
+      recordNudgedRef.current = true;
+      feedbackEngine.emit({ kind: "record-beat", delta: Math.max(1, current - baseline) });
+      soundManager.playRecord();
+      vibrate(30);
+      return;
+    }
+
+    if (baseline - current <= 8 && current >= baseline * 0.9) {
+      recordNudgedRef.current = true;
+      feedbackEngine.emit({ kind: "record-near", delta: baseline - current });
+    }
+  }, [elapsedSeconds, isActive, isComplete, dopamineMode, reducedMotion, vibrate]);
+
+  // Chế độ đếm ngược: 5 giây cuối có nhịp báo căng thẳng, mỗi giây một lần.
+  useEffect(() => {
+    if (mode !== "time" || !isActive || isComplete) return;
+
+    const secondsLeft = timeLimit - elapsedSeconds;
+    if (secondsLeft <= 0 || secondsLeft > 5) return;
+    if (lastCountdownRef.current === secondsLeft) return;
+    lastCountdownRef.current = secondsLeft;
+
+    if (dopamineMode === "off") return;
+    soundManager.playCountdown(secondsLeft);
+    if (secondsLeft <= 3) vibrate(10);
+  }, [mode, isActive, isComplete, elapsedSeconds, timeLimit, dopamineMode, vibrate]);
+
+  // Nhắc nghỉ: tối đa một lần mỗi ngày, không chặn phiên đang gõ.
+  useEffect(() => {
+    if (!wellbeingNudges) return;
+    if (EngagementManager.getSnapshot().shouldNudgeBreak) setBreakNudge(true);
+  }, [wellbeingNudges, isComplete]);
+
   // Keep word container scrolled so active word is in view
   useEffect(() => {
     if (activeWordRef.current && wordsContainerRef.current) {
@@ -485,6 +853,50 @@ export default function TypingGame() {
     }
   }, [currentWordIndex]);
 
+  /**
+   * Phần thưởng khi hoàn thành một từ đúng: hạt sáng, từ vàng, tiếng hiếm.
+   * Không chạy khi DPM tắt.
+   */
+  const rewardWord = useCallback(
+    (wordIndex: number) => {
+      if (dopamineMode === "off") return;
+
+      const golden = goldenFlags[wordIndex] === true;
+      const drop = rollWordReward();
+      feedbackEngine.emit({ kind: "word", golden, drop });
+
+      if (golden) {
+        sessionBonusXpRef.current += 20;
+        EngagementManager.recordGoldenWord();
+        soundManager.playReward("epic");
+        vibrate(24);
+      } else if (drop === "epic" || drop === "rare") {
+        soundManager.playReward(drop);
+        if (drop === "epic") vibrate(18);
+      }
+    },
+    [dopamineMode, goldenFlags, vibrate]
+  );
+
+  // Xử lý sự kiện IME tiếng Việt (Telex / VNI)
+  const handleCompositionStart = () => {
+    isComposingRef.current = true;
+  };
+
+  const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
+    isComposingRef.current = false;
+    const value = e.currentTarget.value;
+    const currentWord = words[currentWordIndex];
+    if (!currentWord) return;
+
+    if (value.length > userInput.length) {
+      const added = value.slice(userInput.length);
+      const isPrefixExtension = value.startsWith(userInput) && currentWord.startsWith(value);
+      const allCorrect = isPrefixExtension && added.length > 0;
+      commitCombo(allCorrect ? comboRef.current + added.length : 0);
+    }
+  };
+
   // Handle Input typing
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isComplete) return;
@@ -499,6 +911,14 @@ export default function TypingGame() {
 
     const currentWord = words[currentWordIndex];
 
+    // Nếu đang trong quá trình ghép dấu tiếng Việt (IME composition), cập nhật input và âm thanh nhưng không ngắt combo oan
+    if (isComposingRef.current) {
+      const typedChar = value.length > userInput.length ? value[value.length - 1] : undefined;
+      soundManager.playKeypress(false, false, typedChar);
+      setUserInput(value);
+      return;
+    }
+
     // Space key detection: user wants to complete word and advance
     if (value.endsWith(" ")) {
       const typedWord = value.trim();
@@ -512,7 +932,8 @@ export default function TypingGame() {
       const isCorrect = typedWord === currentWord;
 
       // Sound feedback
-      soundManager.playKeypress(true, !isCorrect);
+      soundManager.playKeypress(true, !isCorrect, "Space");
+      commitCombo(isCorrect ? comboRef.current + 1 : 0);
 
       const nextStatuses = [...wordStatuses];
       nextStatuses[currentWordIndex] = isCorrect ? "correct" : "incorrect";
@@ -524,6 +945,7 @@ export default function TypingGame() {
 
       if (isCorrect) {
         setPerfectWordsCount((prev) => prev + 1);
+        rewardWord(currentWordIndex);
       } else {
         setErrorCount((prev) => prev + 1);
       }
@@ -536,6 +958,7 @@ export default function TypingGame() {
         setWords((prev) => [...prev, ...moreWords]);
         setWordStatuses((prev) => [...prev, ...new Array(moreWords.length).fill("pending")]);
         setWordInputs((prev) => [...prev, ...new Array(moreWords.length).fill("")]);
+        setGoldenFlags((prev) => [...prev, ...buildGoldenFlags(moreWords.length)]);
       }
 
       // Check if test completed in word/phrase mode
@@ -555,8 +978,18 @@ export default function TypingGame() {
       value.length > 0 &&
       (value.length > currentWord.length || value[value.length - 1] !== currentWord[value.length - 1]);
 
-    soundManager.playKeypress(false, isErrorChar);
+    const typedChar = value.length > userInput.length ? value[value.length - 1] : undefined;
+    soundManager.playKeypress(false, isErrorChar, typedChar);
     setUserInput(value);
+
+    // Combo: chỉ cộng khi phần gõ thêm khớp từ đích. IME làm thay đổi độ dài
+    // (Telex/VNI) hoặc backspace không bị coi là lỗi để tránh reset oan.
+    if (value.length > userInput.length) {
+      const added = value.slice(userInput.length);
+      const isPrefixExtension = value.startsWith(userInput) && currentWord.startsWith(value);
+      const allCorrect = isPrefixExtension && added.length > 0;
+      commitCombo(allCorrect ? comboRef.current + added.length : 0);
+    }
 
     // If on the last word and user typed it completely and accurately, finish immediately!
     if (
@@ -573,6 +1006,8 @@ export default function TypingGame() {
       setWordInputs(nextInputs);
 
       setPerfectWordsCount((prev) => prev + 1);
+      commitCombo(comboRef.current + 1);
+      rewardWord(currentWordIndex);
 
       const elapsedSec = startTime ? Math.max(1, Math.round((Date.now() - startTime) / 1000)) : 1;
       finishGame(currentWordIndex + 1, "", nextStatuses, words, nextInputs, elapsedSec);
@@ -588,18 +1023,21 @@ export default function TypingGame() {
       return;
     }
 
-    // If Backspace pressed on empty input and not on first word, go back to previous word
-    if (e.key === "Backspace" && userInput === "" && currentWordIndex > 0) {
-      e.preventDefault();
-      const prevIdx = currentWordIndex - 1;
-      setCurrentWordIndex(prevIdx);
-      const prevTyped = wordInputs[prevIdx] || "";
-      setUserInput(prevTyped);
+    // If Backspace pressed, play realistic key sound and handle word navigation
+    if (e.key === "Backspace") {
+      soundManager.playKeypress(false, false, "Backspace");
+      if (userInput === "" && currentWordIndex > 0) {
+        e.preventDefault();
+        const prevIdx = currentWordIndex - 1;
+        setCurrentWordIndex(prevIdx);
+        const prevTyped = wordInputs[prevIdx] || "";
+        setUserInput(prevTyped);
 
-      // Reset previous status to pending
-      const nextStatuses = [...wordStatuses];
-      nextStatuses[prevIdx] = "pending";
-      setWordStatuses(nextStatuses);
+        // Reset previous status to pending
+        const nextStatuses = [...wordStatuses];
+        nextStatuses[prevIdx] = "pending";
+        setWordStatuses(nextStatuses);
+      }
     }
   };
 
@@ -618,6 +1056,11 @@ export default function TypingGame() {
   const handleDifficultyChange = (newDiff: DifficultyType) => {
     setDifficulty(newDiff);
     PreferencesManager.savePreferences({ difficulty: newDiff });
+    // Nếu đang bật adaptiveMode, chuyển về chế độ thủ công khi người dùng click chọn độ khó
+    if (adaptiveMode) {
+      setAdaptiveMode(false);
+      PreferencesManager.savePreferences({ adaptiveMode: false });
+    }
   };
 
   const handleModeChange = (newMode: ModeType) => {
@@ -633,64 +1076,116 @@ export default function TypingGame() {
   };
 
   const cycleSoundSwitch = () => {
-    const sequence: SwitchType[] = ["blue", "brown", "linear", "off"];
-    const nextIdx = (sequence.indexOf(soundSwitch) + 1) % sequence.length;
-    setSoundSwitch(sequence[nextIdx]);
+    const sequence: SwitchType[] = ["blue", "brown", "red", "off"];
+    const normalizedCurrent = soundSwitch === "linear" ? "red" : soundSwitch;
+    const nextIdx = (sequence.indexOf(normalizedCurrent) + 1) % sequence.length;
+    const nextSwitch = sequence[nextIdx];
+    setSoundSwitch(nextSwitch);
+    PreferencesManager.savePreferences({ soundSwitch: nextSwitch });
   };
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between selection:bg-primary/20 selection:text-primary">
       {/* Top Header Navigation */}
-      <header className="border-b border-border/60 bg-card/40 backdrop-blur-md sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent"
+        />
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs">
-              <Keyboard className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-primary via-primary/90 to-primary/70 bg-clip-text text-transparent">
-                  TypeFlow
-                </span>
-                <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded-md bg-primary/15 text-primary">
-                  2.0
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground hidden sm:block">
-                Luyện gõ tiếng Việt & English thông minh
-              </p>
+            <LogoPreviewDialog
+              currentConcept={logoConcept}
+              onSelectConcept={handleSelectLogoConcept}
+              trigger={
+                <button
+                  type="button"
+                  className="group flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg text-left transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  title="Bấm để xem chi tiết & chuyển đổi các mẫu Logo"
+                >
+                  <div className="shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)] group-hover:-translate-y-0.5">
+                    {React.createElement(getLogoIcon(logoConcept), { size: 32 })}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[1.3rem] leading-none font-extrabold tracking-tight text-foreground">
+                        Type<span className="text-foreground/75">Flow</span>
+                      </span>
+                      <span className="rounded-full border border-border/70 bg-muted/50 px-1.5 py-0.5 text-[9.5px] leading-none font-bold tracking-[0.14em] text-muted-foreground uppercase">
+                        2.0
+                      </span>
+                    </div>
+                    <p className="mt-1 hidden text-[11px] leading-none text-muted-foreground sm:block">
+                      Luyện gõ tiếng Việt & English thông minh
+                    </p>
+                  </div>
+                </button>
+              }
+            />
+            <div className="hidden lg:block">
+              <LogoPreviewDialog
+                currentConcept={logoConcept}
+                onSelectConcept={handleSelectLogoConcept}
+              />
             </div>
           </div>
 
           {/* Quick Stats & Controls */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {/* Streak */}
             {streakInfo && streakInfo.current > 0 && (
-              <Badge
-                variant="outline"
-                className="hidden items-center gap-1 border-warning/30 bg-warning/10 text-warning sm:flex"
-              >
-                <Flame className="size-3.5" aria-hidden />
-                <span className="font-bold">{streakInfo.current} ngày</span>
-              </Badge>
+              <>
+                <Badge
+                  variant="outline"
+                  className="hidden h-9 items-center gap-1.5 rounded-lg border-warning/30 bg-warning/10 px-2.5 text-warning sm:flex"
+                >
+                  <Flame className="size-3.5 fill-warning/20" aria-hidden />
+                  <span className="text-[11px] leading-none font-bold tabular-nums">
+                    {streakInfo.current} ngày
+                  </span>
+                </Badge>
+                <span
+                  aria-hidden
+                  className="mx-0.5 hidden h-6 w-px bg-border sm:block"
+                />
+              </>
             )}
+
+            {/* DPM Mode */}
+            <DopamineControl
+              mode={dopamineMode}
+              onModeChange={handleDopamineModeChange}
+              effectsVolume={effectsVolume}
+              onEffectsVolumeChange={handleEffectsVolumeChange}
+              haptics={haptics}
+              onHapticsChange={handleHapticsChange}
+              wellbeingNudges={wellbeingNudges}
+              onWellbeingNudgesChange={handleWellbeingChange}
+              reducedMotion={reducedMotion}
+              level={engagement?.level ?? 1}
+              onReset={handleResetEngagement}
+            />
+
+            <span aria-hidden className="mx-0.5 hidden h-6 w-px bg-border md:block" />
 
             {/* Sound Toggle */}
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={cycleSoundSwitch}
-              className="h-9 gap-1.5 px-2.5 text-xs font-medium"
-              title={`Âm thanh phím: ${soundSwitch}`}
+              className="h-9 gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              title={`Âm thanh phím: ${soundSwitch === "off" ? "Tắt" : soundSwitch.toUpperCase()}`}
               aria-label={`Âm thanh phím: ${soundSwitch}`}
             >
               {soundSwitch === "off" ? (
-                <VolumeX className="size-4 text-muted-foreground" aria-hidden />
+                <VolumeX className="size-4" aria-hidden />
               ) : (
                 <Volume2 className="size-4 text-primary" aria-hidden />
               )}
-              <span className="hidden capitalize md:inline">{soundSwitch}</span>
+              <span className="hidden capitalize md:inline">
+                {soundSwitch === "off" ? "Tắt âm" : soundSwitch === "linear" ? "Red" : soundSwitch}
+              </span>
             </Button>
 
             {/* Dashboard */}
@@ -698,7 +1193,7 @@ export default function TypingGame() {
               variant="outline"
               size="sm"
               onClick={() => openDashboard("overview")}
-              className="h-9 gap-1.5 px-2.5 text-xs font-medium"
+              className="h-9 gap-1.5 rounded-lg border-border/70 px-2.5 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
             >
               <BarChart3 className="size-4 text-primary" aria-hidden />
               <span className="hidden md:inline">Bảng điều khiển</span>
@@ -712,7 +1207,7 @@ export default function TypingGame() {
               aria-pressed={sidebarOpen}
               aria-label={sidebarOpen ? "Ẩn bảng phụ" : "Hiện bảng phụ"}
               title={sidebarOpen ? "Ẩn bảng phụ" : "Hiện bảng phụ"}
-              className="hidden h-9 w-9 px-0 xl:inline-flex"
+              className="hidden h-9 w-9 rounded-lg px-0 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground xl:inline-flex"
             >
               {sidebarOpen ? (
                 <PanelRightClose className="size-4" aria-hidden />
@@ -743,8 +1238,12 @@ export default function TypingGame() {
                 achievements={newAchievements}
                 wpmHistory={wpmTimeline}
                 onRestart={initializeGame}
-                onRetry={initializeGame}
+                onRetry={retrySameGame}
                 onOpenDashboard={openDashboard}
+                extras={resultExtras}
+                dopamineMode={dopamineMode}
+                showDopaminePrompt={!dopaminePromptSeen}
+                onDopaminePromptAction={handleDopaminePromptAction}
               />
             ) : (
               /* Active Typing Arena & Controls */
@@ -864,20 +1363,32 @@ export default function TypingGame() {
               <div className="flex items-center gap-1 bg-background/80 p-1 rounded-xl border border-border/60">
                 <Gauge className="w-3.5 h-3.5 ml-2 text-muted-foreground" />
                 <SegmentedHighlight className="flex items-center gap-1">
-                  {(["easy", "medium", "hard"] as DifficultyType[]).map((d) => (
-                    <button
-                      key={d}
-                      onClick={() => handleDifficultyChange(d)}
-                      data-segment-active={difficulty === d}
-                      className={`relative z-10 px-2.5 py-1 rounded-lg text-xs font-semibold capitalize transition-colors duration-150 ${
-                        difficulty === d
-                          ? "text-primary-foreground"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {d}
-                    </button>
-                  ))}
+                  {(["easy", "medium", "hard"] as DifficultyType[]).map((d) => {
+                    const isAiSelected = adaptiveMode && aiDifficulty === d;
+                    const isSegmentActive = adaptiveMode ? isAiSelected : difficulty === d;
+                    return (
+                      <button
+                        key={d}
+                        onClick={() => handleDifficultyChange(d)}
+                        data-segment-active={isSegmentActive}
+                        className={`relative z-10 px-2.5 py-1 rounded-lg text-xs font-semibold capitalize transition-colors duration-150 flex items-center gap-1 ${
+                          isSegmentActive
+                            ? "text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                        title={
+                          adaptiveMode
+                            ? isAiSelected
+                              ? `AI đang chọn độ khó: ${d}`
+                              : `Bấm để chuyển sang độ khó thủ công: ${d}`
+                            : `Độ khó: ${d}`
+                        }
+                      >
+                        {isAiSelected && <Sparkle className="w-2.5 h-2.5 text-primary-foreground animate-pulse" />}
+                        <span>{d}</span>
+                      </button>
+                    );
+                  })}
                 </SegmentedHighlight>
               </div>
 
@@ -893,12 +1404,46 @@ export default function TypingGame() {
                     ? "bg-primary/10 border-primary/30 text-primary"
                     : "bg-background/80 border-border/60 text-muted-foreground hover:text-foreground"
                 }`}
-                title="Tự động điều chỉnh độ khó và huấn luyện viên thời gian thực"
+                title={
+                  adaptiveMode
+                    ? `AI đang chọn độ khó [${aiDifficulty.toUpperCase()}] & rèn luyện từ yếu (Bấm để tắt)`
+                    : "Bật AI Adaptive để tự động điều chỉnh độ khó và huấn luyện viên thời gian thực"
+                }
               >
                 <Sparkle className={`w-3.5 h-3.5 ${adaptiveMode ? "animate-spin text-primary" : ""}`} />
                 <span>AI Adaptive</span>
+                {adaptiveMode && (
+                  <span className="text-[10px] px-1 py-0.5 bg-primary/20 rounded font-normal uppercase leading-none">
+                    {aiDifficulty}
+                  </span>
+                )}
               </button>
             </div>
+
+            <ComboMeter
+              combo={combo}
+              bestCombo={Math.max(engagement?.bestCombo ?? 0, combo)}
+              mode={dopamineMode}
+            />
+
+            {breakNudge ? (
+              <div className="flex items-center gap-2.5 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-[11.5px] text-warning animate-in fade-in slide-in-from-top-1 duration-200">
+                <Coffee className="size-4 shrink-0" aria-hidden />
+                <p className="flex-1">
+                  Bạn đã luyện {engagement?.todayMinutes ?? 25} phút hôm nay. Nghỉ mắt 20 giây nhé?
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBreakNudge(false);
+                    EngagementManager.markNudgeShown();
+                  }}
+                  className="shrink-0 rounded-md border border-warning/30 bg-background/40 px-2 py-0.5 text-[10.5px] font-semibold text-warning transition-colors hover:bg-warning/15"
+                >
+                  Đã hiểu
+                </button>
+              </div>
+            ) : null}
 
             {/* Live Stats HUD (Realtime) */}
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
@@ -931,6 +1476,18 @@ export default function TypingGame() {
                   : "border-border hover:border-border/80"
               }`}
             >
+              {/* Viền "flow" khi combo cao — chỉ DPM tối đa, chỉ opacity. */}
+              {dopamineMode === "dpm" && !reducedMotion && comboTier(combo) >= 2 ? (
+                <div
+                  aria-hidden
+                  className="dpm-vignette pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-primary/25"
+                  style={{
+                    boxShadow:
+                      "inset 0 0 70px color-mix(in oklch, var(--primary) 16%, transparent)",
+                  }}
+                />
+              ) : null}
+
               {/* Unfocused overlay prompt */}
               {!isFocused && !isActive && (
                 <div className="absolute inset-0 bg-background/50 backdrop-blur-[1px] rounded-3xl flex items-center justify-center z-20 animate-in fade-in zoom-in-95 duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)]">
@@ -950,19 +1507,31 @@ export default function TypingGame() {
                   const isCurrent = wordIdx === currentWordIndex;
                   const isPast = wordIdx < currentWordIndex;
                   const status = wordStatuses[wordIdx];
+                  const isGolden =
+                    goldenFlags[wordIdx] === true && !isPast && dopamineMode !== "off";
+                  const caretGlow =
+                    dopamineMode === "dpm" && comboTier(combo) >= 2
+                      ? "shadow-[0_0_10px_var(--primary)]"
+                      : "";
 
                   return (
                     <span
                       key={wordIdx}
                       ref={isCurrent ? activeWordRef : null}
                       className={`relative inline-block transition-colors duration-100 ${
+                        isGolden
+                          ? "underline decoration-warning/50 decoration-dotted underline-offset-4 dpm-golden-word"
+                          : ""
+                      } ${
                         isCurrent
                           ? "text-foreground font-medium"
                           : isPast
                           ? status === "correct"
                             ? "text-muted-foreground/80 animate-word-settle"
                             : "text-destructive/90 underline decoration-destructive decoration-wavy underline-offset-4"
-                          : "text-muted-foreground/35"
+                          : isGolden
+                            ? "text-warning/90"
+                            : "text-muted-foreground/35"
                       }`}
                     >
                       {isCurrent ? (
@@ -997,7 +1566,7 @@ export default function TypingGame() {
                                 {isCaretHere && (
                                   <span
                                     aria-hidden
-                                    className="absolute -left-[1px] top-0 bottom-0 w-[2.5px] bg-primary rounded-full caret-smooth"
+                                    className={`absolute -left-[1px] top-0 bottom-0 w-[2.5px] bg-primary rounded-full caret-smooth ${caretGlow}`}
                                   />
                                 )}
                                 {char}
@@ -1023,7 +1592,7 @@ export default function TypingGame() {
                           {userInput.length >= word.length && (
                             <span
                               aria-hidden
-                              className="inline-block w-[2.5px] h-[1em] bg-primary rounded-full align-middle ml-[1px] caret-smooth"
+                              className={`inline-block w-[2.5px] h-[1em] bg-primary rounded-full align-middle ml-[1px] caret-smooth ${caretGlow}`}
                             />
                           )}
                         </>
@@ -1042,6 +1611,8 @@ export default function TypingGame() {
                 value={userInput}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
+                onCompositionStart={handleCompositionStart}
+                onCompositionEnd={handleCompositionEnd}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
                 className="absolute opacity-0 pointer-events-none w-0 h-0"
@@ -1058,12 +1629,12 @@ export default function TypingGame() {
                 variant="outline"
                 size="lg"
                 onClick={initializeGame}
-                className="gap-2 px-6 rounded-xl hover:bg-primary hover:text-primary-foreground transition-all shadow-xs"
+                className="group gap-2 px-6 rounded-xl hover:bg-primary hover:text-primary-foreground transition-all shadow-xs"
                 title="Bắt đầu lại (Tab + Enter hoặc Esc)"
               >
                 <RotateCcw className="w-4 h-4" />
                 <span>Bắt đầu lại</span>
-                <kbd className="text-[10px] bg-muted px-1.5 py-0.5 rounded border font-mono">
+                <kbd className="text-[10px] bg-muted px-1.5 py-0.5 rounded border font-mono transition-colors group-hover:border-primary-foreground/30 group-hover:bg-primary-foreground/20 group-hover:text-primary-foreground">
                   Esc
                 </kbd>
               </Button>
@@ -1078,6 +1649,8 @@ export default function TypingGame() {
                 streakInfo={streakInfo}
                 recentSessions={recentSessions}
                 onOpenDashboard={openDashboard}
+                engagement={engagement}
+                onClaimQuest={handleClaimQuest}
               />
             </aside>
           ) : null}
@@ -1090,6 +1663,8 @@ export default function TypingGame() {
             recentSessions={recentSessions}
             onOpenDashboard={openDashboard}
             layout="grid"
+            engagement={engagement}
+            onClaimQuest={handleClaimQuest}
           />
         </div>
       </main>
@@ -1111,6 +1686,8 @@ export default function TypingGame() {
           </div>
         </div>
       </footer>
+
+      <FeedbackLayer />
 
       <Dashboard
         open={dashboardOpen}

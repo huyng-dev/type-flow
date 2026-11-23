@@ -1,3 +1,5 @@
+import { ACHIEVEMENT_SEED } from "./achievements-data";
+
 export interface PersonalBests {
   highestScore: ScoreEntry | null;
   fastestWpm: ScoreEntry | null;
@@ -18,6 +20,7 @@ export interface ScoreBreakdown {
   speedBonus: number;
   accuracyBonus: number;
   consistencyBonus: number;
+  comboBonus: number;
   difficultyMultiplier: number;
   languageMultiplier: number;
   streakBonus: number;
@@ -35,7 +38,52 @@ export interface StatsForAchievement {
   longestStreak: number;
   hasNightSession: boolean;
   hasEarlySession: boolean;
+  bestCombo: number;
+  wordsTyped: number;
+  goldenWords: number;
+  hardSessions: number;
+  vietnameseSessions: number;
+  timeSessions: number;
+  phraseSessions: number;
+  longSessions: number;
+  perfectSessions: number;
   [key: string]: unknown;
+}
+
+/** Dữ liệu tối thiểu của một phiên để tính huy hiệu. */
+export interface AchievementSession {
+  wpm: number;
+  accuracy: number;
+  consistency: number;
+  language: string;
+  difficulty: string;
+  contentType: string;
+  wordCount: number;
+  timeElapsed: number;
+  bestCombo?: number;
+}
+
+/** Chỉ số dùng để hiển thị thanh tiến độ của huy hiệu chưa mở. */
+export type AchievementMetric =
+  | "wpm"
+  | "accuracy"
+  | "consistency"
+  | "totalSessions"
+  | "languagesUsed"
+  | "longestStreak"
+  | "bestCombo"
+  | "wordsTyped"
+  | "goldenWords"
+  | "hardSessions"
+  | "vietnameseSessions"
+  | "timeSessions"
+  | "phraseSessions"
+  | "longSessions"
+  | "perfectSessions";
+
+export interface AchievementProgress {
+  current: number;
+  target: number;
 }
 
 /** Khoá biểu tượng (không dùng emoji trong giao diện nữa). */
@@ -52,17 +100,41 @@ export type AchievementIcon =
   | "languages"
   | "flame"
   | "moon"
-  | "sunrise";
+  | "sunrise"
+  | "crown"
+  | "medal"
+  | "keyboard"
+  | "timer"
+  | "layers"
+  | "gauge"
+  | "hash"
+  | "calendar"
+  | "sparkles"
+  | "shield";
+
+export type AchievementCategory =
+  | "speed"
+  | "accuracy"
+  | "consistency"
+  | "combo"
+  | "milestone"
+  | "special";
+
+export type AchievementRarity = "common" | "rare" | "epic" | "legendary";
 
 export interface Achievement {
   id: string;
   name: string;
   description: string;
   icon: AchievementIcon;
-  category: "speed" | "accuracy" | "consistency" | "milestone" | "special";
+  category: AchievementCategory;
   requirement: (stats: StatsForAchievement) => boolean;
   points: number;
-  rarity: "common" | "rare" | "epic" | "legendary";
+  rarity: AchievementRarity;
+  /** Chỉ số + mục tiêu để vẽ tiến độ khi chưa mở khoá. */
+  metric?: AchievementMetric;
+  target?: number;
+  unlocked?: boolean;
   unlockedAt?: number;
 }
 
@@ -97,6 +169,8 @@ export interface ScoreEntry {
   accuracyScore: number;
   consistencyScore: number;
   bonusScore: number;
+  /** Combo dài nhất của phiên; dữ liệu cũ có thể không có trường này. */
+  bestCombo?: number;
 }
 
 export interface StreakData {
@@ -106,191 +180,12 @@ export interface StreakData {
   multiplier: number;
 }
 
-const ACHIEVEMENTS: Achievement[] = [
-  // Speed Achievements
-  {
-    id: "speed_demon_25",
-    name: "Tia chớp",
-    description: "Đạt 25 WPM",
-    icon: "zap",
-    category: "speed",
-    requirement: (stats) => stats.wpm >= 25,
-    points: 100,
-    rarity: "common",
-  },
-  {
-    id: "speed_demon_50",
-    name: "Ngón tay thần tốc",
-    description: "Đạt 50 WPM",
-    icon: "zap",
-    category: "speed",
-    requirement: (stats) => stats.wpm >= 50,
-    points: 250,
-    rarity: "rare",
-  },
-  {
-    id: "speed_demon_75",
-    name: "Bậc thầy tốc độ",
-    description: "Đạt 75 WPM",
-    icon: "rocket",
-    category: "speed",
-    requirement: (stats) => stats.wpm >= 75,
-    points: 500,
-    rarity: "epic",
-  },
-  {
-    id: "speed_demon_100",
-    name: "Gõ siêu thanh",
-    description: "Đạt 100 WPM",
-    icon: "rocket",
-    category: "speed",
-    requirement: (stats) => stats.wpm >= 100,
-    points: 1000,
-    rarity: "legendary",
-  },
-
-  // Accuracy Achievements
-  {
-    id: "accuracy_95",
-    name: "Chuẩn từng phím",
-    description: "Đạt độ chính xác 95%",
-    icon: "target",
-    category: "accuracy",
-    requirement: (stats) => stats.accuracy >= 95,
-    points: 150,
-    rarity: "common",
-  },
-  {
-    id: "accuracy_98",
-    name: "Gần như hoàn hảo",
-    description: "Đạt độ chính xác 98%",
-    icon: "target",
-    category: "accuracy",
-    requirement: (stats) => stats.accuracy >= 98,
-    points: 300,
-    rarity: "rare",
-  },
-  {
-    id: "accuracy_100",
-    name: "Không một lỗi",
-    description: "Đạt độ chính xác 100%",
-    icon: "gem",
-    category: "accuracy",
-    requirement: (stats) => stats.accuracy === 100,
-    points: 750,
-    rarity: "epic",
-  },
-
-  // Consistency Achievements
-  {
-    id: "consistency_master",
-    name: "Nhịp gõ đều tay",
-    description: "Giữ tốc độ ổn định suốt phiên",
-    icon: "activity",
-    category: "consistency",
-    requirement: (stats) => stats.consistency >= 85,
-    points: 200,
-    rarity: "rare",
-  },
-
-  // Milestone Achievements
-  {
-    id: "first_session",
-    name: "Bước đầu tiên",
-    description: "Hoàn thành phiên gõ đầu tiên",
-    icon: "star",
-    category: "milestone",
-    requirement: (stats) => stats.totalSessions >= 1,
-    points: 50,
-    rarity: "common",
-  },
-  {
-    id: "sessions_10",
-    name: "Khởi động",
-    description: "Hoàn thành 10 phiên gõ",
-    icon: "footprints",
-    category: "milestone",
-    requirement: (stats) => stats.totalSessions >= 10,
-    points: 200,
-    rarity: "common",
-  },
-  {
-    id: "sessions_50",
-    name: "Bền bỉ",
-    description: "Hoàn thành 50 phiên gõ",
-    icon: "book",
-    category: "milestone",
-    requirement: (stats) => stats.totalSessions >= 50,
-    points: 500,
-    rarity: "rare",
-  },
-  {
-    id: "sessions_100",
-    name: "Đam mê gõ phím",
-    description: "Hoàn thành 100 phiên gõ",
-    icon: "trophy",
-    category: "milestone",
-    requirement: (stats) => stats.totalSessions >= 100,
-    points: 1000,
-    rarity: "epic",
-  },
-
-  // Special Achievements
-  {
-    id: "multilingual",
-    name: "Đa ngôn ngữ",
-    description: "Luyện tập với nhiều ngôn ngữ",
-    icon: "languages",
-    category: "special",
-    requirement: (stats) => stats.languagesUsed >= 2,
-    points: 300,
-    rarity: "rare",
-  },
-  {
-    id: "streak_7",
-    name: "Chiến binh 7 ngày",
-    description: "Giữ chuỗi 7 ngày liên tiếp",
-    icon: "flame",
-    category: "special",
-    requirement: (stats) => stats.longestStreak >= 7,
-    points: 400,
-    rarity: "rare",
-  },
-  {
-    id: "streak_30",
-    name: "Bậc thầy 30 ngày",
-    description: "Giữ chuỗi 30 ngày liên tiếp",
-    icon: "flame",
-    category: "special",
-    requirement: (stats) => stats.longestStreak >= 30,
-    points: 1500,
-    rarity: "legendary",
-  },
-  {
-    id: "night_owl",
-    name: "Cú đêm",
-    description: "Luyện gõ sau nửa đêm",
-    icon: "moon",
-    category: "special",
-    requirement: (stats) => stats.hasNightSession,
-    points: 100,
-    rarity: "common",
-  },
-  {
-    id: "early_bird",
-    name: "Chim sớm",
-    description: "Luyện gõ trước 6 giờ sáng",
-    icon: "sunrise",
-    category: "special",
-    requirement: (stats) => stats.hasEarlySession,
-    points: 100,
-    rarity: "common",
-  },
-];
+const ACHIEVEMENTS: Achievement[] = ACHIEVEMENT_SEED;
 
 export class ScoringSystem {
   private scoreHistory: ScoreEntry[] = [];
-  private unlockedAchievements: Set<string> = new Set();
+  /** id → timestamp mở khoá. 0 = đã mở từ dữ liệu cũ, không rõ ngày. */
+  private unlockTimes: Map<string, number> = new Map();
   private streakData: StreakData = {
     current: 0,
     longest: 0,
@@ -314,8 +209,9 @@ export class ScoringSystem {
     timeElapsed: number;
     perfectWords: number;
     totalWords: number;
+    bestCombo?: number;
   }): ScoreBreakdown {
-    const { wpm, accuracy, consistency, language, difficulty, timeElapsed, perfectWords, totalWords } = sessionData;
+    const { wpm, accuracy, consistency, language, difficulty, timeElapsed, perfectWords, totalWords, bestCombo } = sessionData;
 
     // Base score from WPM and accuracy
     const baseScore = Math.round(wpm * (accuracy / 100) * 10);
@@ -340,6 +236,10 @@ export class ScoringSystem {
     // Streak bonus
     const streakBonus = Math.round(this.streakData.current * 50 * this.streakData.multiplier);
 
+    // Combo bonus: thưởng cho chuỗi gõ đúng, tối đa 200 điểm.
+    // Độc lập với DPM — bật/tắt hiệu ứng không đổi điểm.
+    const comboBonus = Math.min(200, Math.max(0, Math.round((bestCombo ?? 0) * 2)));
+
     // Perfect word bonus
     const perfectWordBonus = Math.round((perfectWords / totalWords) * 300);
 
@@ -348,7 +248,7 @@ export class ScoringSystem {
     const timeBonus = Math.round(Math.min(timeMinutes * 10, 200));
 
     // Calculate total score
-    const subtotal = baseScore + speedBonus + accuracyBonus + consistencyBonus + perfectWordBonus + timeBonus + streakBonus;
+    const subtotal = baseScore + speedBonus + accuracyBonus + consistencyBonus + comboBonus + perfectWordBonus + timeBonus + streakBonus;
     const totalScore = Math.round(subtotal * difficultyMultiplier * languageMultiplier);
 
     return {
@@ -356,6 +256,7 @@ export class ScoringSystem {
       speedBonus,
       accuracyBonus,
       consistencyBonus,
+      comboBonus,
       difficultyMultiplier,
       languageMultiplier,
       streakBonus,
@@ -432,38 +333,101 @@ export class ScoringSystem {
     };
   }
 
-  // Check for new achievements
-  checkAchievements(
-    sessionData: Partial<StatsForAchievement>,
-    userStats: Partial<StatsForAchievement>
-  ): Achievement[] {
-    const newAchievements: Achievement[] = [];
+  /**
+   * Dựng thống kê huy hiệu từ lịch sử + phiên hiện tại.
+   * Nhờ cộng phiên hiện tại ở đây, `first_session` mở ngay ở phiên đầu thay vì
+   * phải chờ StatisticsManager lưu xong (lỗi lệch một phiên trước đây).
+   */
+  private buildStats(
+    session?: AchievementSession,
+    extra?: Partial<StatsForAchievement>
+  ): StatsForAchievement {
+    const list: AchievementSession[] = session
+      ? [...this.scoreHistory, session]
+      : this.scoreHistory;
+    const countWhere = (predicate: (entry: AchievementSession) => boolean) =>
+      list.filter(predicate).length;
+    const maxOf = (pick: (entry: AchievementSession) => number) =>
+      list.reduce((best, entry) => Math.max(best, pick(entry)), 0);
+    const hour = new Date().getHours();
 
-    const currentHour = new Date().getHours();
-    const combinedStats: StatsForAchievement = {
-      wpm: 0,
-      accuracy: 0,
-      consistency: 0,
-      totalSessions: 0,
-      languagesUsed: 1,
+    // Xét giờ của từng phiên đã lưu để huy hiệu "Cú đêm"/"Chim sớm" vẫn đúng
+    // khi mở khoá bù cho dữ liệu cũ. Chỉ dùng giờ hiện tại khi đang có phiên mới.
+    const hasNightFromHistory = this.scoreHistory.some((entry) => {
+      const entryHour = new Date(entry.timestamp).getHours();
+      return entryHour >= 0 && entryHour < 4;
+    });
+    const hasEarlyFromHistory = this.scoreHistory.some((entry) => {
+      const entryHour = new Date(entry.timestamp).getHours();
+      return entryHour >= 4 && entryHour < 6;
+    });
+
+    return {
+      wpm: maxOf((entry) => entry.wpm),
+      accuracy: maxOf((entry) => entry.accuracy),
+      consistency: maxOf((entry) => entry.consistency),
+      totalSessions: list.length,
+      languagesUsed: new Set(list.map((entry) => entry.language)).size,
       longestStreak: this.streakData.longest,
-      hasNightSession: currentHour >= 0 && currentHour < 6,
-      hasEarlySession: currentHour >= 4 && currentHour < 6,
-      ...userStats,
-      ...sessionData,
+      // Ca đêm 0–4h và ca sớm 4–6h tách rời để hai huy hiệu không trùng nhau.
+      hasNightSession: hasNightFromHistory || (Boolean(session) && hour < 4),
+      hasEarlySession: hasEarlyFromHistory || (Boolean(session) && hour >= 4 && hour < 6),
+      bestCombo: maxOf((entry) => entry.bestCombo ?? 0),
+      wordsTyped: list.reduce((sum, entry) => sum + entry.wordCount, 0),
+      goldenWords: 0,
+      hardSessions: countWhere((entry) => entry.difficulty === "hard"),
+      vietnameseSessions: countWhere((entry) => entry.language === "vietnamese"),
+      timeSessions: countWhere((entry) => entry.contentType === "time"),
+      phraseSessions: countWhere((entry) => entry.contentType === "phrases"),
+      longSessions: countWhere((entry) => entry.timeElapsed >= 300),
+      perfectSessions: countWhere(
+        (entry) => entry.accuracy >= 100 && entry.wordCount >= 10
+      ),
+      ...extra,
     };
+  }
+
+  /** Mở khoá mọi huy hiệu thoả điều kiện; chống trùng bằng map id → thời điểm. */
+  private award(stats: StatsForAchievement): Achievement[] {
+    const now = Date.now();
+    const unlocked: Achievement[] = [];
 
     for (const achievement of ACHIEVEMENTS) {
-      if (!this.unlockedAchievements.has(achievement.id)) {
-        if (achievement.requirement(combinedStats)) {
-          this.unlockedAchievements.add(achievement.id);
-          achievement.unlockedAt = Date.now();
-          newAchievements.push(achievement);
-        }
-      }
+      if (this.unlockTimes.has(achievement.id)) continue;
+      if (!achievement.requirement(stats)) continue;
+      this.unlockTimes.set(achievement.id, now);
+      unlocked.push({ ...achievement, unlocked: true, unlockedAt: now });
     }
 
-    return newAchievements;
+    if (unlocked.length > 0) this.saveToStorage();
+    return unlocked;
+  }
+
+  // Check for new achievements
+  checkAchievements(
+    session: AchievementSession,
+    extra?: Partial<StatsForAchievement>
+  ): Achievement[] {
+    return this.award(this.buildStats(session, extra));
+  }
+
+  /** Tiến độ từng huy hiệu (chỉ huy hiệu có metric + target). */
+  getAchievementProgress(
+    extra?: Partial<StatsForAchievement>
+  ): Record<string, AchievementProgress> {
+    const stats = this.buildStats(undefined, extra);
+    const progress: Record<string, AchievementProgress> = {};
+
+    for (const achievement of ACHIEVEMENTS) {
+      if (!achievement.metric || achievement.target === undefined) continue;
+      const value = Number(stats[achievement.metric] ?? 0);
+      progress[achievement.id] = {
+        current: Math.max(0, Math.min(value, achievement.target)),
+        target: achievement.target,
+      };
+    }
+
+    return progress;
   }
 
   // Update streak data
@@ -500,14 +464,15 @@ export class ScoringSystem {
       timeElapsed: number;
       perfectWords: number;
       totalWords: number;
+      bestCombo?: number;
     },
-    userStats: Partial<StatsForAchievement>
+    extra?: Partial<StatsForAchievement>
   ): { scoreEntry: ScoreEntry; newAchievements: Achievement[] } {
     this.updateStreak();
 
     const breakdown = this.calculateScore(sessionData);
     const rating = this.calculateRating(sessionData.wpm, sessionData.accuracy, sessionData.consistency);
-    const newAchievements = this.checkAchievements(sessionData, userStats);
+    const newAchievements = this.checkAchievements(sessionData, extra);
 
     const scoreEntry: ScoreEntry = {
       id: `score_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -529,6 +494,7 @@ export class ScoringSystem {
       accuracyScore: breakdown.accuracyBonus,
       consistencyScore: breakdown.consistencyBonus,
       bonusScore: breakdown.perfectWordBonus + breakdown.timeBonus + breakdown.streakBonus,
+      bestCombo: sessionData.bestCombo ?? 0,
     };
 
     this.scoreHistory.push(scoreEntry);
@@ -567,15 +533,10 @@ export class ScoringSystem {
   }
 
   // Get achievement statistics
-  getAchievementStats(): {
-    total: number;
-    unlocked: number;
-    points: number;
-    byCategory: Record<string, { total: number; unlocked: number }>;
-    recent: Achievement[];
-  } {
+  getAchievementStats(): AchievementStats {
     const byCategory: Record<string, { total: number; unlocked: number }> = {};
     let totalPoints = 0;
+    let unlockedCount = 0;
 
     for (const achievement of ACHIEVEMENTS) {
       if (!byCategory[achievement.category]) {
@@ -583,19 +544,27 @@ export class ScoringSystem {
       }
       byCategory[achievement.category].total++;
 
-      if (this.unlockedAchievements.has(achievement.id)) {
+      if (this.unlockTimes.has(achievement.id)) {
         byCategory[achievement.category].unlocked++;
         totalPoints += achievement.points;
+        unlockedCount++;
       }
     }
 
-    const recent = ACHIEVEMENTS.filter((a) => this.unlockedAchievements.has(a.id) && a.unlockedAt)
-      .sort((a, b) => (b.unlockedAt || 0) - (a.unlockedAt || 0))
-      .slice(0, 5);
+    // "Gần đây" dựa trên timestamp đã lưu, nên vẫn đúng sau khi reload.
+    const recent: Achievement[] = [];
+    const byUnlockTime = [...this.unlockTimes.entries()].sort((a, b) => b[1] - a[1]);
+
+    for (const [id, unlockedAt] of byUnlockTime) {
+      if (unlockedAt <= 0) continue;
+      const achievement = ACHIEVEMENTS.find((item) => item.id === id);
+      if (achievement) recent.push({ ...achievement, unlocked: true, unlockedAt });
+      if (recent.length >= 5) break;
+    }
 
     return {
       total: ACHIEVEMENTS.length,
-      unlocked: this.unlockedAchievements.size,
+      unlocked: unlockedCount,
       points: totalPoints,
       byCategory,
       recent,
@@ -614,16 +583,21 @@ export class ScoringSystem {
 
   // Get all achievements
   getAllAchievements(): Achievement[] {
-    return ACHIEVEMENTS.map((achievement) => ({
-      ...achievement,
-      unlockedAt: this.unlockedAchievements.has(achievement.id) ? achievement.unlockedAt : undefined,
-    }));
+    return ACHIEVEMENTS.map((achievement) => {
+      const unlockedAt = this.unlockTimes.get(achievement.id);
+      return {
+        ...achievement,
+        unlocked: unlockedAt !== undefined,
+        // 0 = đã mở từ dữ liệu cũ nhưng không có ngày chính xác.
+        unlockedAt: unlockedAt && unlockedAt > 0 ? unlockedAt : undefined,
+      };
+    });
   }
 
   // Clear all data
   clearData(): void {
     this.scoreHistory = [];
-    this.unlockedAchievements.clear();
+    this.unlockTimes.clear();
     this.streakData = {
       current: 0,
       longest: 0,
@@ -635,31 +609,82 @@ export class ScoringSystem {
 
   // Save to localStorage
   private saveToStorage(): void {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("typeflow-scores", JSON.stringify(this.scoreHistory));
-      localStorage.setItem("typeflow-achievements", JSON.stringify([...this.unlockedAchievements]));
-      localStorage.setItem("typeflow-streak", JSON.stringify(this.streakData));
+    if (typeof window === "undefined") return;
+
+    try {
+      window.localStorage.setItem("typeflow-scores", JSON.stringify(this.scoreHistory));
+      window.localStorage.setItem(
+        "typeflow-achievements",
+        JSON.stringify({
+          version: 2,
+          unlocks: Object.fromEntries(this.unlockTimes),
+        })
+      );
+      window.localStorage.setItem("typeflow-streak", JSON.stringify(this.streakData));
+    } catch {
+      // Hết quota hoặc chế độ riêng tư: giữ dữ liệu trong bộ nhớ phiên.
     }
   }
 
   // Load from localStorage
+  public reloadFromStorage(): void {
+    this.loadFromStorage();
+  }
+
   private loadFromStorage(): void {
-    if (typeof window !== "undefined") {
-      const scoresData = localStorage.getItem("typeflow-scores");
+    if (typeof window === "undefined") return;
+
+    let migrated = false;
+
+    try {
+      const scoresData = window.localStorage.getItem("typeflow-scores");
       if (scoresData) {
-        this.scoreHistory = JSON.parse(scoresData);
+        const parsed = JSON.parse(scoresData) as unknown;
+        if (Array.isArray(parsed)) this.scoreHistory = parsed as ScoreEntry[];
       }
-
-      const achievementsData = localStorage.getItem("typeflow-achievements");
-      if (achievementsData) {
-        this.unlockedAchievements = new Set(JSON.parse(achievementsData));
-      }
-
-      const streakData = localStorage.getItem("typeflow-streak");
-      if (streakData) {
-        this.streakData = JSON.parse(streakData);
-      }
+    } catch {
+      // Dữ liệu điểm hỏng: bỏ qua, không chặn ứng dụng.
     }
+
+    try {
+      const achievementsData = window.localStorage.getItem("typeflow-achievements");
+      if (achievementsData) {
+        const parsed = JSON.parse(achievementsData) as unknown;
+
+        if (Array.isArray(parsed)) {
+          // Định dạng cũ: mảng id. Migrate sang map, không biết ngày mở.
+          for (const id of parsed) {
+            if (typeof id === "string") this.unlockTimes.set(id, 0);
+          }
+          migrated = true;
+        } else if (parsed && typeof parsed === "object" && "unlocks" in parsed) {
+          const unlocks = (parsed as { unlocks?: Record<string, unknown> }).unlocks ?? {};
+          for (const [id, unlockedAt] of Object.entries(unlocks)) {
+            if (typeof unlockedAt === "number" && Number.isFinite(unlockedAt)) {
+              this.unlockTimes.set(id, unlockedAt);
+            }
+          }
+        }
+      }
+    } catch {
+      this.unlockTimes.clear();
+    }
+
+    try {
+      const streakData = window.localStorage.getItem("typeflow-streak");
+      if (streakData) {
+        const parsed = JSON.parse(streakData) as Partial<StreakData>;
+        this.streakData = { ...this.streakData, ...parsed };
+      }
+    } catch {
+      // Dữ liệu chuỗi hỏng: giữ mặc định.
+    }
+
+    // Dữ liệu cũ có thể đã đủ điều kiện cho huy hiệu mới thêm vào danh mục:
+    // đánh giá bù một lần khi tải để bộ sưu tập luôn nhất quán.
+    this.award(this.buildStats());
+
+    if (migrated) this.saveToStorage();
   }
 }
 

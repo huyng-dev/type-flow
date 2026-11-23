@@ -105,6 +105,53 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Scrollbar
+   Theme-aware: mọi biến bên dưới đều là CSS var của theme đang bật, nên thanh
+   cuộn đổi màu cùng giao diện mà không cần JS. Không dùng scrollbar-gutter
+   toàn cục để tránh đẩy layout khi mở/đóng dialog.
+--------------------------------------------------------------------------- */
+
+:root {
+  --scrollbar-thumb: color-mix(in oklch, var(--muted-foreground) 38%, transparent);
+  --scrollbar-thumb-hover: color-mix(in oklch, var(--primary) 72%, var(--muted-foreground));
+}
+
+/* Firefox + trình duyệt hỗ trợ chuẩn. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+/* Chromium / WebKit: track trong suốt, thumb bo tròn nằm gọn trong rãnh. */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-color: var(--scrollbar-thumb);
+  background-clip: content-box;
+  transition: background-color 150ms ease;
+}
+
+*::-webkit-scrollbar-thumb:hover,
+*::-webkit-scrollbar-thumb:active {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+/* Thanh cuộn ngang trong bảng dữ liệu: thấp hơn để không chiếm chỗ. */
+*::-webkit-scrollbar:horizontal {
+  height: 8px;
+}
+
 /* Added proper definition for retro-glow class */
 @layer utilities {
   .retro-glow {
@@ -196,6 +243,77 @@
   animation: legendaryPulse 800ms var(--ease-out-soft) 1;
 }
 
+/* ---------------------------------------------------------------------------
+   DPM Mode — phản hồi thưởng.
+   Chỉ transform/opacity. Không phần tử nào trong vùng gõ bị đổi layout.
+   Mọi hiệu ứng đều bị tắt bởi khối prefers-reduced-motion ở cuối file.
+--------------------------------------------------------------------------- */
+
+/* Từ vàng: nhấp nháy rất nhẹ, chỉ đổi opacity + text-shadow (paint-only). */
+@keyframes dpmGolden {
+  0%, 100% { opacity: 0.78; }
+  50% { opacity: 1; }
+}
+
+.dpm-golden-word {
+  text-shadow: 0 0 14px color-mix(in oklch, var(--warning) 45%, transparent);
+  animation: dpmGolden 1.8s ease-in-out infinite;
+}
+
+/* Hạt sáng khi hoàn thành từ: bay lên rồi tắt, không chặn tương tác. */
+@keyframes dpmSparkRise {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.6); }
+  18% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--dx, 0px), var(--dy, -46px), 0) scale(1.05); }
+}
+
+.dpm-spark {
+  animation: dpmSparkRise 640ms var(--ease-out-soft) both;
+}
+
+/* Confetti kết quả: rơi một lần, tự biến mất. */
+@keyframes dpmConfettiFall {
+  0% { opacity: 0; transform: translate3d(0, -14px, 0) rotate(0deg); }
+  12% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--dx, 0px), 72vh, 0) rotate(var(--rot, 180deg)); }
+}
+
+.dpm-confetti {
+  animation: dpmConfettiFall var(--dur, 1150ms) cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+/* Viền "flow" khi combo cao: thở rất chậm, chỉ opacity. */
+@keyframes dpmVignette {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.7; }
+}
+
+.dpm-vignette {
+  animation: dpmVignette 2.6s ease-in-out infinite;
+}
+
+/* Số combo nhảy một nhịp khi lên bậc mới. */
+@keyframes dpmTierPop {
+  0% { transform: scale(1); }
+  42% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+
+.dpm-tier-pop {
+  animation: dpmTierPop 260ms var(--ease-out-soft) 1;
+}
+
+/* Nút DPM đang hoạt động: quầng sáng rất nhẹ, không loop mạnh. */
+@keyframes dpmActiveGlow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 30%, transparent); }
+  50% { box-shadow: 0 0 0 4px color-mix(in oklch, var(--primary) 12%, transparent); }
+}
+
+.dpm-active-glow {
+  animation: dpmActiveGlow 2.8s ease-in-out infinite;
+}
+
 /* Sparkline: vẽ dần bằng stroke-dashoffset, chạy một lần khi mount. */
 @keyframes sparkDraw {
   to { stroke-dashoffset: 0; }
@@ -226,6 +344,11 @@
   .caret-smooth {
     animation: none;
     opacity: 1;
+  }
+
+  /* Scrollbar không chuyển màu từ từ khi người dùng giảm chuyển động. */
+  *::-webkit-scrollbar-thumb {
+    transition: none !important;
   }
 }
 

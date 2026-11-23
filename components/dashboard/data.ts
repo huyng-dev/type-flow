@@ -11,11 +11,13 @@ import {
 import {
   scoringSystem,
   type Achievement,
+  type AchievementProgress,
   type AchievementStats,
   type PersonalBests,
   type ScoreEntry,
   type StreakData,
 } from "@/lib/scoring-system"
+import { EngagementManager } from "@/lib/engagement"
 import {
   StatisticsManager,
   type GameSession,
@@ -62,6 +64,7 @@ export interface DashboardData {
   bests: PersonalBests
   achievementStats: AchievementStats
   achievements: Achievement[]
+  achievementProgress: Record<string, AchievementProgress>
   streak: StreakData
   skill: SkillAssessment
   trends: PerformanceTrends
@@ -116,6 +119,7 @@ function buildDifficultyStats(sessions: GameSession[]): DifficultyStat[] {
 
 export function buildDashboardData(range: TimeRange): DashboardData {
   const allSessions = StatisticsManager.getAllSessions()
+  const engagement = EngagementManager.getSnapshot()
 
   return {
     summary: StatisticsManager.calculateSummary(),
@@ -127,6 +131,10 @@ export function buildDashboardData(range: TimeRange): DashboardData {
     bests: scoringSystem.getPersonalBests(),
     achievementStats: scoringSystem.getAchievementStats(),
     achievements: scoringSystem.getAllAchievements(),
+    achievementProgress: scoringSystem.getAchievementProgress({
+      goldenWords: engagement.goldenWords,
+      bestCombo: engagement.bestCombo,
+    }),
     streak: scoringSystem.getStreakInfo(),
     skill: adaptiveAlgorithm.assessSkill(),
     trends: adaptiveAlgorithm.getPerformanceTrends(),

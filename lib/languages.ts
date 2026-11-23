@@ -690,6 +690,7 @@ export interface WordSelectionOptions {
   contentType: ContentType;
   count: number;
   avoidRepeats?: boolean;
+  wordWeights?: Record<string, number>;
 }
 
 export class LanguageManager {
@@ -713,7 +714,7 @@ export class LanguageManager {
   }
 
   generateContent(options: WordSelectionOptions): string[] {
-    const { language, difficulty, contentType, count, avoidRepeats = true } = options;
+    const { language, difficulty, contentType, count, avoidRepeats = true, wordWeights } = options;
 
     if (contentType === "phrases") {
       const phrases = this.getPhraseList(language, difficulty);
@@ -745,7 +746,22 @@ export class LanguageManager {
     const availableItems = avoidRepeats ? flattenedList.filter((item) => !this.recentWords.has(item)) : flattenedList;
     const itemsToUse = availableItems.length >= count ? availableItems : flattenedList;
 
-    for (let i = 0; i < count; i++) {
+    // Ưu tiên đưa vào các từ yếu (weakWords có weight > 1) cần rèn luyện
+    const weakWordCandidates = wordWeights
+      ? Object.entries(wordWeights)
+          .filter(([w, weight]) => weight > 1 && flattenedList.includes(w))
+          .map(([w]) => w)
+      : [];
+
+    const weakWordsToInject: string[] = [];
+    if (weakWordCandidates.length > 0) {
+      const maxWeak = Math.min(Math.ceil(count * 0.25), weakWordCandidates.length);
+      const shuffledWeak = [...weakWordCandidates].sort(() => Math.random() - 0.5);
+      weakWordsToInject.push(...shuffledWeak.slice(0, maxWeak));
+    }
+
+    const standardCountNeeded = count - weakWordsToInject.length;
+    for (let i = 0; i < standardCountNeeded; i++) {
       const randomIndex = Math.floor(Math.random() * itemsToUse.length);
       const selectedItem = itemsToUse[randomIndex];
       result.push(selectedItem);
@@ -759,6 +775,15 @@ export class LanguageManager {
             this.recentWords.delete(firstItem);
           }
         }
+      }
+    }
+
+    // Chèn các từ yếu vào vị trí ngẫu nhiên
+    for (const weakWord of weakWordsToInject) {
+      const insertIdx = Math.floor(Math.random() * (result.length + 1));
+      result.splice(insertIdx, 0, weakWord);
+      if (avoidRepeats) {
+        this.recentWords.add(weakWord);
       }
     }
 

@@ -1,3 +1,5 @@
+export type DopamineMode = "off" | "balanced" | "dpm";
+
 export interface UserPreferences {
   theme: string;
   language: string;
@@ -7,6 +9,13 @@ export interface UserPreferences {
   avoidRepeats: boolean;
   adaptiveMode: boolean;
   sidebarOpen: boolean;
+  /** Mức phản hồi thưởng. Chỉ đổi cách hiển thị, không đổi điểm số. */
+  dopamineMode: DopamineMode;
+  effectsVolume: number;
+  haptics: boolean;
+  wellbeingNudges: boolean;
+  dopaminePromptSeen: boolean;
+  soundSwitch?: string;
 }
 
 export class PreferencesManager {
@@ -21,6 +30,12 @@ export class PreferencesManager {
     avoidRepeats: true,
     adaptiveMode: true,
     sidebarOpen: true,
+    dopamineMode: "balanced",
+    effectsVolume: 0.6,
+    haptics: false,
+    wellbeingNudges: true,
+    dopaminePromptSeen: false,
+    soundSwitch: "blue",
   };
 
   // Fallback storage when localStorage is not available (SSR / tests)

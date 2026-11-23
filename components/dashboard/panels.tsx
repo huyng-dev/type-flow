@@ -2,12 +2,14 @@
 
 import { useRef, useState, type ReactNode } from "react"
 import {
+  Activity,
   Award,
   BarChart3,
   Brain,
   Check,
   Download,
   Flame,
+  Gauge,
   Lightbulb,
   Minus,
   Sparkles,
@@ -15,13 +17,16 @@ import {
   TrendingDown,
   TrendingUp,
   Trash2,
+  Trophy,
   Upload,
+  type LucideIcon,
 } from "lucide-react"
 
 import { AchievementBadge } from "@/components/achievement-icon"
 import { EmptyState, Meter, Panel, Sparkline, StatTile, toneTextClass } from "@/components/data-display"
 import { Button } from "@/components/ui/button"
 import { adaptiveAlgorithm } from "@/lib/adaptive-algorithm"
+import { EngagementManager } from "@/lib/engagement"
 import {
   scoringSystem,
   type Achievement,
@@ -337,8 +342,21 @@ export function ProgressPanel({
   )
 }
 
+const ACHIEVEMENT_CATEGORIES: {
+  id: "speed" | "accuracy" | "consistency" | "combo" | "milestone" | "special"
+  label: string
+  icon: LucideIcon
+}[] = [
+  { id: "speed", label: "Tốc độ", icon: Gauge },
+  { id: "accuracy", label: "Chính xác", icon: Target },
+  { id: "consistency", label: "Độ ổn định", icon: Activity },
+  { id: "combo", label: "Combo", icon: Flame },
+  { id: "milestone", label: "Cột mốc", icon: Trophy },
+  { id: "special", label: "Đặc biệt", icon: Sparkles },
+]
+
 export function AchievementsPanel({ data }: { data: DashboardData }) {
-  const { achievementStats, achievements } = data
+  const { achievementStats, achievements, achievementProgress } = data
   const total = achievementStats.total
   const unlocked = achievementStats.unlocked
   const completion = total > 0 ? Math.round((unlocked / total) * 100) : 0
@@ -352,6 +370,7 @@ export function AchievementsPanel({ data }: { data: DashboardData }) {
           <StatTile label="Điểm thưởng" value={formatNumber(achievementStats.points)} tone="warning" />
           <StatTile label="Hoàn thành" value={`${completion}%`} tone="success" />
         </div>
+
         <div className="mt-4">
           <Meter
             label="Toàn bộ huy hiệu"
@@ -361,18 +380,94 @@ export function AchievementsPanel({ data }: { data: DashboardData }) {
             tone="primary"
           />
         </div>
+
+        <ul className="mt-4 grid gap-2 @xl/dialog:grid-cols-2 @4xl/dialog:grid-cols-3">
+          {ACHIEVEMENT_CATEGORIES.map((category) => {
+            const stats = achievementStats.byCategory[category.id] ?? { total: 0, unlocked: 0 }
+            const ratio = stats.total > 0 ? stats.unlocked / stats.total : 0
+            const Icon = category.icon
+
+            return (
+              <li key={category.id} className="rounded-lg border border-border/60 bg-background/40 px-2.5 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex min-w-0 items-center gap-1.5 text-[11px] font-semibold">
+                    <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="truncate">{category.label}</span>
+                  </span>
+                  <span className="shrink-0 text-[10px] font-semibold text-muted-foreground tabular-nums">
+                    {stats.unlocked}/{stats.total}
+                  </span>
+                </div>
+                <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
+                  <div
+                    className="h-full w-full origin-left rounded-full bg-primary transition-transform duration-300"
+                    style={{ transform: `scaleX(${ratio})` }}
+                  />
+                </div>
+              </li>
+            )
+          })}
+        </ul>
       </Panel>
 
-      <Panel title="Tất cả huy hiệu" description="Huy hiệu chưa mở sẽ hiển thị mờ">
-        {achievements.length > 0 ? (
+      {achievementStats.recent.length > 0 ? (
+        <Panel title="Mở gần đây" description="5 huy hiệu mới nhất, vẫn giữ sau khi tải lại">
           <div className="grid gap-2.5 @2xl/dialog:grid-cols-2 @4xl/dialog:grid-cols-3">
-            {achievements.map((achievement) => (
-              <AchievementBadge
-                key={achievement.id}
-                achievement={achievement}
-                unlocked={Boolean(achievement.unlockedAt)}
-              />
+            {achievementStats.recent.map((achievement) => (
+              <AchievementBadge key={achievement.id} achievement={achievement} unlocked />
             ))}
+          </div>
+        </Panel>
+      ) : null}
+
+      <Panel
+        title="Bộ sưu tập"
+        description={`${unlocked}/${total} huy hiệu · huy hiệu chưa mở hiển thị tiến độ`}
+      >
+        {achievements.length > 0 ? (
+          <div className="space-y-5">
+            {ACHIEVEMENT_CATEGORIES.map((category) => {
+              const items = achievements
+                .filter((achievement) => achievement.category === category.id)
+                .sort(
+                  (a, b) =>
+                    Number(Boolean(b.unlocked)) - Number(Boolean(a.unlocked)) ||
+                    a.points - b.points
+                )
+
+              if (items.length === 0) return null
+              const stats = achievementStats.byCategory[category.id] ?? { total: 0, unlocked: 0 }
+              const Icon = category.icon
+
+              return (
+                <section key={category.id} aria-labelledby={`achievement-group-${category.id}`}>
+                  <div className="flex items-center gap-2">
+                    <Icon className="size-3.5 text-primary" aria-hidden />
+                    <h3
+                      id={`achievement-group-${category.id}`}
+                      className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground uppercase"
+                    >
+                      {category.label}
+                    </h3>
+                    <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
+                      {stats.unlocked}/{stats.total}
+                    </span>
+                    <span className="ml-auto h-px flex-1 bg-border/60" aria-hidden />
+                  </div>
+
+                  <div className="mt-2 grid gap-2.5 @2xl/dialog:grid-cols-2 @4xl/dialog:grid-cols-3">
+                    {items.map((achievement) => (
+                      <AchievementBadge
+                        key={achievement.id}
+                        achievement={achievement}
+                        unlocked={Boolean(achievement.unlocked)}
+                        progress={achievementProgress[achievement.id] ?? null}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )
+            })}
           </div>
         ) : (
           <EmptyState icon={Award} title="Chưa có huy hiệu" />
@@ -613,6 +708,8 @@ export function SessionsPanel({ data, onRefresh }: { data: DashboardData; onRefr
     reader.onload = (loadEvent) => {
       const content = String(loadEvent.target?.result ?? "")
       if (StatisticsManager.importData(content)) {
+        scoringSystem.reloadFromStorage()
+        adaptiveAlgorithm.reloadFromStorage()
         setNotice({ tone: "success", text: "Nhập dữ liệu thành công." })
         onRefresh()
       } else {
@@ -634,6 +731,7 @@ export function SessionsPanel({ data, onRefresh }: { data: DashboardData; onRefr
     StatisticsManager.clearAllData()
     scoringSystem.clearData()
     adaptiveAlgorithm.clearData()
+    EngagementManager.reset()
     setConfirming(null)
     setNotice({ tone: "success", text: "Đã xoá toàn bộ dữ liệu luyện tập." })
     onRefresh()
@@ -778,6 +876,9 @@ export function LatestScorePanel({ score }: { score: ScoreEntry }) {
       value: `+${formatNumber(score.breakdown.consistencyBonus)}`,
       tone: "text-success",
     },
+    ...(score.breakdown.comboBonus
+      ? [{ label: "Thưởng combo", value: `+${formatNumber(score.breakdown.comboBonus)}`, tone: "text-warning" }]
+      : []),
     {
       label: "Thưởng từ hoàn hảo",
       value: `+${formatNumber(score.breakdown.perfectWordBonus)}`,
