@@ -11,8 +11,7 @@ import { SegmentedHighlight } from "@/components/ui/segmented";
 import { ComboMeter } from "@/components/combo-meter";
 import { DopamineControl } from "@/components/dopamine-control";
 import { FeedbackLayer } from "@/components/feedback-layer";
-import { getLogoIcon, type LogoConcept } from "@/components/logo";
-import { LogoPreviewDialog } from "@/components/logo-preview-dialog";
+import { LogoConcept1Isometric } from "@/components/logo";
 
 import { PreferencesManager } from "@/lib/preferences";
 import { adaptiveAlgorithm } from "@/lib/adaptive-algorithm";
@@ -145,21 +144,6 @@ export default function TypingGame() {
   // Streak & lịch sử gần đây (chỉ đọc localStorage khi cần, không đọc mỗi lần gõ phím)
   const [streakInfo, setStreakInfo] = useState<StreakData | null>(null);
   const [recentSessions, setRecentSessions] = useState<GameSession[]>([]);
-  const [logoConcept, setLogoConcept] = useState<LogoConcept>("1-isometric");
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("typeflow-logo-concept");
-      if (saved) setLogoConcept(saved as LogoConcept);
-    }
-  }, []);
-
-  const handleSelectLogoConcept = useCallback((concept: LogoConcept) => {
-    setLogoConcept(concept);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("typeflow-logo-concept", String(concept));
-    }
-  }, []);
 
   const openDashboard = useCallback((tab: DashboardTab = "overview") => {
     setDashboardTab(tab);
@@ -1102,40 +1086,29 @@ export default function TypingGame() {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
-            <LogoPreviewDialog
-              currentConcept={logoConcept}
-              onSelectConcept={handleSelectLogoConcept}
-              trigger={
-                <button
-                  type="button"
-                  className="group flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg text-left transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  title="Bấm để xem chi tiết & chuyển đổi các mẫu Logo"
-                >
-                  <div className="shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)] group-hover:-translate-y-0.5">
-                    {React.createElement(getLogoIcon(logoConcept), { size: 32 })}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[1.3rem] leading-none font-extrabold tracking-tight text-foreground">
-                        Type<span className="text-foreground/75">Flow</span>
-                      </span>
-                      <span className="rounded-full border border-border/70 bg-muted/50 px-1.5 py-0.5 text-[9.5px] leading-none font-bold tracking-[0.14em] text-muted-foreground uppercase">
-                        2.0
-                      </span>
-                    </div>
-                    <p className="mt-1 hidden text-[11px] leading-none text-muted-foreground sm:block">
-                      Luyện gõ tiếng Việt & English thông minh
-                    </p>
-                  </div>
-                </button>
-              }
-            />
-            <div className="hidden lg:block">
-              <LogoPreviewDialog
-                currentConcept={logoConcept}
-                onSelectConcept={handleSelectLogoConcept}
-              />
-            </div>
+            <button
+              type="button"
+              onClick={initializeGame}
+              className="group flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg text-left transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              title="TypeFlow 2.0 - Luyện gõ tiếng Việt & English thông minh (Bấm để bắt đầu bài mới)"
+            >
+              <div className="shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)] group-hover:-translate-y-0.5">
+                <LogoConcept1Isometric size={32} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[1.3rem] leading-none font-extrabold tracking-tight text-foreground">
+                    Type<span className="text-foreground/75">Flow</span>
+                  </span>
+                  <span className="rounded-full border border-border/70 bg-muted/50 px-1.5 py-0.5 text-[9.5px] leading-none font-bold tracking-[0.14em] text-muted-foreground uppercase">
+                    2.0
+                  </span>
+                </div>
+                <p className="mt-1 hidden text-[11px] leading-none text-muted-foreground sm:block">
+                  Luyện gõ tiếng Việt & English thông minh
+                </p>
+              </div>
+            </button>
           </div>
 
           {/* Quick Stats & Controls */}
