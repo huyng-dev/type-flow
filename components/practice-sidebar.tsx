@@ -61,7 +61,7 @@ export function PracticeSidebar({
           <button
             type="button"
             onClick={() => onOpenDashboard("sessions")}
-            className="text-[11px] font-semibold text-primary hover:underline"
+            className="rounded-sm text-[11px] font-semibold text-primary underline-offset-2 transition-[color,background-color,box-shadow] duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             Tất cả
           </button>
@@ -118,7 +118,7 @@ export function PracticeSidebar({
       <button
         type="button"
         onClick={() => onOpenDashboard("overview")}
-        className={`flex w-full items-center justify-between rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-left transition-colors hover:bg-primary/15 ${
+        className={`group flex w-full items-center justify-between rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-left transition-[background-color,border-color,box-shadow,scale] duration-150 active:duration-75 motion-safe:active:scale-[0.99] hover:border-primary/40 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
           layout === "grid" ? "sm:col-span-2" : ""
         }`}
       >
@@ -128,7 +128,10 @@ export function PracticeSidebar({
             Thống kê, huy hiệu, AI Coach
           </span>
         </span>
-        <ChevronRight className="size-4 text-primary" aria-hidden />
+        <ChevronRight
+          className="size-4 text-primary transition-[translate] duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)] group-hover:translate-x-0.5"
+          aria-hidden
+        />
       </button>
     </div>
   )

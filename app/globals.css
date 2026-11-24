@@ -103,6 +103,35 @@
   body {
     @apply bg-background text-foreground transition-colors duration-300;
   }
+
+  /* Tailwind v4 không còn đặt cursor: pointer cho control. Dùng :where() để
+     specificity bằng 0 — utility như cursor-text của vùng gõ vẫn thắng. */
+  :where(
+    button,
+    [role="button"],
+    [role="tab"],
+    [role="switch"],
+    [role="option"],
+    [role="menuitem"],
+    [role="checkbox"],
+    [role="radio"],
+    summary,
+    select,
+    input[type="checkbox"],
+    input[type="radio"],
+    input[type="range"],
+    input[type="file"]
+  ) {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  :where(button, [role="button"], [role="tab"], [role="switch"]):disabled,
+  :where(select, input):disabled,
+  :where([aria-disabled="true"]) {
+    cursor: not-allowed;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -183,6 +212,8 @@
 
 :root {
   --ease-out-soft: cubic-bezier(0.2, 0.9, 0.4, 1);
+  /* Hơi nảy — chỉ dùng cho thumb segmented và check xuất hiện. */
+  --ease-spring: cubic-bezier(0.34, 1.45, 0.64, 1);
   --duration-fast: 120ms;
   --duration-base: 200ms;
   --duration-slow: 320ms;

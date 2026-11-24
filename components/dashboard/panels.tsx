@@ -243,10 +243,10 @@ export function ProgressPanel({
                 type="button"
                 onClick={() => onRangeChange(option.value)}
                 className={cn(
-                  "rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-colors",
+                  "rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-[color,background-color,box-shadow,scale] duration-150 active:duration-75 motion-safe:active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   range === option.value
                     ? "bg-card text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                 )}
                 aria-pressed={range === option.value}
               >

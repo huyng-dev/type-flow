@@ -56,7 +56,7 @@ export function ThemeSelector({ className }: { className?: string }) {
           <Button
             variant="outline"
             size="sm"
-            className="h-9 gap-1.5 rounded-lg border-border/70 px-2.5 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+            className="h-9 gap-1.5 rounded-lg border-border/70 px-2.5 text-xs font-medium hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
           >
             <Palette className="size-4 text-primary" aria-hidden />
             <span className="hidden md:inline">{currentTheme.name}</span>
@@ -127,15 +127,15 @@ function ThemeCard({
       onClick={onSelect}
       aria-pressed={selected}
       className={cn(
-        "group relative flex w-full flex-col gap-2 rounded-xl border p-3 text-left transition-[transform,box-shadow,border-color,background-color] duration-150 ease-[cubic-bezier(0.2,0.9,0.4,1)] hover:-translate-y-0.5 hover:shadow-sm",
-        "focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none",
+        "group relative flex w-full flex-col gap-2 rounded-xl border p-3 text-left transition-[translate,scale,box-shadow,border-color,background-color] duration-150 ease-[cubic-bezier(0.2,0.9,0.4,1)] active:duration-75 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.99] hover:shadow-sm",
+        "focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
         selected
           ? "border-primary/50 bg-primary/5 ring-1 ring-primary/30"
           : "border-border/70 bg-background/40 hover:border-border hover:bg-muted/30"
       )}
     >
       {selected ? (
-        <span className="absolute top-2 right-2 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground">
+        <span className="absolute top-2 right-2 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground animate-in zoom-in-50 duration-150">
           <Check className="size-3" aria-hidden />
         </span>
       ) : null}

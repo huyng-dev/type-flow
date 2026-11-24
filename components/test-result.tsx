@@ -234,15 +234,21 @@ export function TestResult({
 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="lg" onClick={onRestart} className="gap-2 font-semibold">
+          <Button size="lg" onClick={onRestart} className="group gap-2 font-semibold">
             Bài tiếp theo
-            <ArrowRight className="size-4" aria-hidden />
-            <kbd className="ml-1 hidden rounded bg-primary-foreground/20 px-1.5 py-0.5 font-mono text-[10px] sm:inline-block">
+            <ArrowRight
+              className="size-4 transition-[translate] duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)] group-hover:translate-x-0.5"
+              aria-hidden
+            />
+            <kbd className="ml-1 hidden rounded bg-primary-foreground/20 px-1.5 py-0.5 font-mono text-[10px] transition-[transform,scale] duration-150 group-active:scale-95 sm:inline-block">
               Tab + Enter
             </kbd>
           </Button>
-          <Button variant="outline" size="lg" onClick={onRetry} className="gap-2">
-            <RotateCcw className="size-4" aria-hidden />
+          <Button variant="outline" size="lg" onClick={onRetry} className="group gap-2">
+            <RotateCcw
+              className="size-4 transition-[rotate] duration-300 ease-[cubic-bezier(0.2,0.9,0.4,1)] group-hover:-rotate-[30deg]"
+              aria-hidden
+            />
             Thử lại bài này
           </Button>
         </div>

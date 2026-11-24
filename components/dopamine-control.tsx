@@ -85,7 +85,7 @@ export function DopamineControl({
           size="sm"
           aria-label={`DPM Mode: ${MODE_LABEL[mode]}. Mở cài đặt phản hồi thưởng.`}
           className={cn(
-            "h-9 gap-1.5 px-2.5 text-xs font-medium transition-colors",
+            "h-9 gap-1.5 px-2.5 text-xs font-medium",
             mode !== "off"
               ? "border-primary/35 bg-primary/5 text-primary hover:border-primary/50 hover:bg-primary/12 hover:text-primary"
               : "hover:bg-muted/60 hover:text-foreground"
@@ -125,7 +125,7 @@ export function DopamineControl({
                       aria-pressed={active}
                       onClick={() => onModeChange(option.id)}
                       className={cn(
-                        "flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-[background-color,border-color,transform] duration-150 ease-[cubic-bezier(0.2,0.9,0.4,1)] hover:-translate-y-0.5",
+                        "flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-[translate,scale,background-color,border-color,box-shadow] duration-150 ease-[cubic-bezier(0.2,0.9,0.4,1)] active:duration-75 motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                         active
                           ? "border-primary/45 bg-primary/8 ring-1 ring-primary/25"
                           : "border-border/70 bg-background/40 hover:border-border"
@@ -261,13 +261,13 @@ function ToggleRow({
         aria-label={label}
         onClick={() => onChange(!checked)}
         className={cn(
-          "relative mt-0.5 h-5 w-9 shrink-0 rounded-full border transition-colors duration-150",
+          "group relative mt-0.5 h-5 w-9 shrink-0 rounded-full border transition-[background-color,border-color,box-shadow] duration-150 active:duration-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           checked ? "border-primary bg-primary" : "border-border bg-muted"
         )}
       >
         <span
           className={cn(
-            "absolute top-0.5 left-0.5 size-3.5 rounded-full bg-background shadow-sm transition-transform duration-150 ease-[cubic-bezier(0.2,0.9,0.4,1)]",
+            "absolute top-0.5 left-0.5 size-3.5 origin-left rounded-full bg-background shadow-sm transition-[transform,scale] duration-150 ease-[cubic-bezier(0.2,0.9,0.4,1)] motion-safe:group-active:scale-x-110",
             checked && "translate-x-4"
           )}
         />

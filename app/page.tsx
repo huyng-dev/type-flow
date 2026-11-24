@@ -58,6 +58,17 @@ import {
 
 type ModeType = "words" | "time" | "phrases";
 
+const SEGMENT_BASE =
+  "relative z-10 rounded-lg text-xs font-semibold transition-[color,background-color,scale] duration-150 active:duration-75 motion-safe:active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+function segmentClass(active: boolean, extra = "") {
+  return `${SEGMENT_BASE} ${extra} ${
+    active
+      ? "text-primary-foreground"
+      : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+  }`;
+}
+
 interface GameStats {
   wpm: number;
   accuracy: number;
@@ -1089,10 +1100,10 @@ export default function TypingGame() {
             <button
               type="button"
               onClick={initializeGame}
-              className="group flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg text-left transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="group flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg text-left transition-[scale,opacity] duration-150 active:duration-75 motion-safe:active:scale-[0.98] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               title="TypeFlow 2.0 - Luyện gõ tiếng Việt & English thông minh (Bấm để bắt đầu bài mới)"
             >
-              <div className="shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)] group-hover:-translate-y-0.5">
+              <div className="shrink-0 transition-[translate] duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)] group-hover:-translate-y-0.5">
                 <LogoConcept1Isometric size={32} />
               </div>
               <div className="min-w-0">
@@ -1154,15 +1165,20 @@ export default function TypingGame() {
               variant="ghost"
               size="sm"
               onClick={cycleSoundSwitch}
-              className="h-9 gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              className="h-9 gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               title={`Âm thanh phím: ${soundSwitch === "off" ? "Tắt" : soundSwitch.toUpperCase()}`}
               aria-label={`Âm thanh phím: ${soundSwitch}`}
             >
-              {soundSwitch === "off" ? (
-                <VolumeX className="size-4" aria-hidden />
-              ) : (
-                <Volume2 className="size-4 text-primary" aria-hidden />
-              )}
+              <span
+                key={soundSwitch}
+                className="inline-flex animate-in fade-in zoom-in-75 duration-150"
+              >
+                {soundSwitch === "off" ? (
+                  <VolumeX className="size-4" aria-hidden />
+                ) : (
+                  <Volume2 className="size-4 text-primary" aria-hidden />
+                )}
+              </span>
               <span className="hidden capitalize md:inline">
                 {soundSwitch === "off" ? "Tắt âm" : soundSwitch === "linear" ? "Red" : soundSwitch}
               </span>
@@ -1173,7 +1189,7 @@ export default function TypingGame() {
               variant="outline"
               size="sm"
               onClick={() => openDashboard("overview")}
-              className="h-9 gap-1.5 rounded-lg border-border/70 px-2.5 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+              className="h-9 gap-1.5 rounded-lg border-border/70 px-2.5 text-xs font-medium hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
             >
               <BarChart3 className="size-4 text-primary" aria-hidden />
               <span className="hidden md:inline">Bảng điều khiển</span>
@@ -1187,7 +1203,7 @@ export default function TypingGame() {
               aria-pressed={sidebarOpen}
               aria-label={sidebarOpen ? "Ẩn bảng phụ" : "Hiện bảng phụ"}
               title={sidebarOpen ? "Ẩn bảng phụ" : "Hiện bảng phụ"}
-              className="hidden h-9 w-9 rounded-lg px-0 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground xl:inline-flex"
+              className="hidden h-9 w-9 rounded-lg px-0 text-muted-foreground hover:bg-muted/60 hover:text-foreground xl:inline-flex"
             >
               {sidebarOpen ? (
                 <PanelRightClose className="size-4" aria-hidden />
@@ -1237,22 +1253,14 @@ export default function TypingGame() {
                   <button
                     onClick={() => handleLanguageChange("english")}
                     data-segment-active={language === "english"}
-                    className={`relative z-10 px-3 py-1 rounded-lg text-xs font-semibold transition-colors duration-150 ${
-                      language === "english"
-                        ? "text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={segmentClass(language === "english", "px-3 py-1")}
                   >
                     English
                   </button>
                   <button
                     onClick={() => handleLanguageChange("vietnamese")}
                     data-segment-active={language === "vietnamese"}
-                    className={`relative z-10 px-3 py-1 rounded-lg text-xs font-semibold transition-colors duration-150 ${
-                      language === "vietnamese"
-                        ? "text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={segmentClass(language === "vietnamese", "px-3 py-1")}
                   >
                     Tiếng Việt
                   </button>
@@ -1265,11 +1273,7 @@ export default function TypingGame() {
                   <button
                     onClick={() => handleModeChange("words")}
                     data-segment-active={mode === "words"}
-                    className={`relative z-10 px-3 py-1 rounded-lg text-xs font-semibold transition-colors duration-150 flex items-center gap-1.5 ${
-                      mode === "words"
-                        ? "text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={segmentClass(mode === "words", "flex items-center gap-1.5 px-3 py-1")}
                   >
                     <Type className="w-3.5 h-3.5" />
                     <span>Words</span>
@@ -1277,11 +1281,7 @@ export default function TypingGame() {
                   <button
                     onClick={() => handleModeChange("time")}
                     data-segment-active={mode === "time"}
-                    className={`relative z-10 px-3 py-1 rounded-lg text-xs font-semibold transition-colors duration-150 flex items-center gap-1.5 ${
-                      mode === "time"
-                        ? "text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={segmentClass(mode === "time", "flex items-center gap-1.5 px-3 py-1")}
                   >
                     <Clock className="w-3.5 h-3.5" />
                     <span>Time</span>
@@ -1289,11 +1289,7 @@ export default function TypingGame() {
                   <button
                     onClick={() => handleModeChange("phrases")}
                     data-segment-active={mode === "phrases"}
-                    className={`relative z-10 px-3 py-1 rounded-lg text-xs font-semibold transition-colors duration-150 flex items-center gap-1.5 ${
-                      mode === "phrases"
-                        ? "text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={segmentClass(mode === "phrases", "flex items-center gap-1.5 px-3 py-1")}
                   >
                     <Quote className="w-3.5 h-3.5" />
                     <span>Phrases</span>
@@ -1313,11 +1309,7 @@ export default function TypingGame() {
                             initializeGame();
                           }}
                           data-segment-active={timeLimit === t}
-                          className={`relative z-10 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors duration-150 ${
-                            timeLimit === t
-                              ? "text-primary-foreground"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
+                          className={segmentClass(timeLimit === t, "px-2.5 py-1")}
                         >
                           {t}s
                         </button>
@@ -1327,11 +1319,7 @@ export default function TypingGame() {
                           key={cnt}
                           onClick={() => handleWordCountChange(cnt)}
                           data-segment-active={wordCount === cnt}
-                          className={`relative z-10 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors duration-150 ${
-                            wordCount === cnt
-                              ? "text-primary-foreground"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
+                          className={segmentClass(wordCount === cnt, "px-2.5 py-1")}
                         >
                           {cnt}
                         </button>
@@ -1351,11 +1339,7 @@ export default function TypingGame() {
                         key={d}
                         onClick={() => handleDifficultyChange(d)}
                         data-segment-active={isSegmentActive}
-                        className={`relative z-10 px-2.5 py-1 rounded-lg text-xs font-semibold capitalize transition-colors duration-150 flex items-center gap-1 ${
-                          isSegmentActive
-                            ? "text-primary-foreground"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
+                        className={segmentClass(isSegmentActive, "flex items-center gap-1 px-2.5 py-1 capitalize")}
                         title={
                           adaptiveMode
                             ? isAiSelected
@@ -1379,10 +1363,10 @@ export default function TypingGame() {
                   setAdaptiveMode(nextState);
                   PreferencesManager.savePreferences({ adaptiveMode: nextState });
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-[scale,background-color,border-color,color,box-shadow] duration-150 active:duration-75 motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   adaptiveMode
-                    ? "bg-primary/10 border-primary/30 text-primary"
-                    : "bg-background/80 border-border/60 text-muted-foreground hover:text-foreground"
+                    ? "bg-primary/10 border-primary/30 text-primary hover:bg-primary/15"
+                    : "bg-background/80 border-border/60 text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                 }`}
                 title={
                   adaptiveMode
@@ -1418,7 +1402,7 @@ export default function TypingGame() {
                     setBreakNudge(false);
                     EngagementManager.markNudgeShown();
                   }}
-                  className="shrink-0 rounded-md border border-warning/30 bg-background/40 px-2 py-0.5 text-[10.5px] font-semibold text-warning transition-colors hover:bg-warning/15"
+                  className="shrink-0 rounded-md border border-warning/30 bg-background/40 px-2 py-0.5 text-[10.5px] font-semibold text-warning transition-[scale,background-color] duration-150 active:duration-75 motion-safe:active:scale-95 hover:bg-warning/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   Đã hiểu
                 </button>
@@ -1609,12 +1593,12 @@ export default function TypingGame() {
                 variant="outline"
                 size="lg"
                 onClick={initializeGame}
-                className="group gap-2 px-6 rounded-xl hover:bg-primary hover:text-primary-foreground transition-all shadow-xs"
+                className="group gap-2 px-6 rounded-xl hover:bg-primary hover:text-primary-foreground shadow-xs"
                 title="Bắt đầu lại (Tab + Enter hoặc Esc)"
               >
-                <RotateCcw className="w-4 h-4" />
+                <RotateCcw className="w-4 h-4 transition-[rotate] duration-300 ease-[cubic-bezier(0.2,0.9,0.4,1)] group-hover:-rotate-[30deg]" />
                 <span>Bắt đầu lại</span>
-                <kbd className="text-[10px] bg-muted px-1.5 py-0.5 rounded border font-mono transition-colors group-hover:border-primary-foreground/30 group-hover:bg-primary-foreground/20 group-hover:text-primary-foreground">
+                <kbd className="text-[10px] bg-muted px-1.5 py-0.5 rounded border font-mono transition-[transform,scale,background-color,border-color,color] duration-150 group-hover:border-primary-foreground/30 group-hover:bg-primary-foreground/20 group-hover:text-primary-foreground group-active:scale-95">
                   Esc
                 </kbd>
               </Button>

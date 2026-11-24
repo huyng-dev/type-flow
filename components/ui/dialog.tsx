@@ -91,7 +91,7 @@ function DialogContent({
         {showCloseButton ? (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute top-3.5 right-3.5 grid size-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none"
+            className="absolute top-3.5 right-3.5 grid size-8 place-items-center rounded-lg text-muted-foreground transition-[rotate,scale,color,background-color] duration-150 ease-[cubic-bezier(0.2,0.9,0.4,1)] hover:rotate-90 hover:bg-muted hover:text-foreground active:duration-75 motion-safe:active:scale-90 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none"
           >
             <XIcon className="size-4" aria-hidden />
             <span className="sr-only">Đóng</span>

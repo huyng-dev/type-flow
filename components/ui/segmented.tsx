@@ -64,12 +64,16 @@ export function SegmentedHighlight({
       {rect ? (
         <span
           aria-hidden
-          className="pointer-events-none absolute left-0 top-0 rounded-lg bg-primary shadow-xs"
+          className="pointer-events-none absolute left-0 top-0 rounded-lg bg-primary"
           style={{
             width: rect.w,
             height: rect.h,
             transform: `translate3d(${rect.x}px, ${rect.y}px, 0)`,
-            transition: reduced ? "none" : "transform 200ms cubic-bezier(0.2,0.9,0.4,1), width 200ms cubic-bezier(0.2,0.9,0.4,1)",
+            transition: reduced
+              ? "none"
+              : "transform 240ms var(--ease-spring), width 240ms var(--ease-spring)",
+            boxShadow:
+              "inset 0 1px 0 0 color-mix(in oklch, var(--primary-foreground) 18%, transparent), 0 1px 2px 0 rgb(0 0 0 / 0.06)",
           }}
         />
       ) : null}
