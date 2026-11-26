@@ -87,17 +87,16 @@ TypeFlowing là một **phòng luyện gõ phím** dành cho người Việt, ch
 
 ## Tải về
 
-Bản dựng sẵn cho **Windows x64** nằm ở [trang Releases](https://github.com/huyng-dev/type-flowing/releases/latest) — mở mục **Assets** của bản mới nhất và chọn file phù hợp:
+Bản dựng sẵn cho **Windows x64** nằm ở [trang Releases](https://github.com/huyng-dev/type-flowing/releases/latest). Hai file trong mục **Assets**:
 
-| File | Khi nào dùng |
-| :-- | :-- |
-| `TypeFlowing_1.0.0_x64_en-US.msi` | Cài đặt chuẩn qua Windows Installer — có shortcut trong Start Menu, gỡ cài trong *Apps & features* |
-| `TypeFlowing_1.0.0_x64-setup.exe` | Trình cài dạng EXE, tương đương bản MSI |
-| `TypeFlowing.exe` | Bản **portable** — chạy trực tiếp, không cần cài đặt |
+| File | Khi nào dùng | Tải trực tiếp |
+| :-- | :-- | :-- |
+| `TypeFlowing.msi` | Cài đặt chuẩn qua Windows Installer — có shortcut trong Start Menu, gỡ cài trong *Apps & features* | [**TypeFlowing.msi**](https://github.com/huyng-dev/type-flowing/releases/latest/download/TypeFlowing.msi) |
+| `TypeFlowing.exe` | Bản **portable** — chạy trực tiếp, không cần cài đặt | [**TypeFlowing.exe**](https://github.com/huyng-dev/type-flowing/releases/latest/download/TypeFlowing.exe) |
 
 **Yêu cầu:** Windows 10/11 64-bit và **WebView2 Runtime** (đã có sẵn trên Windows 11 và hầu hết Windows 10).
 
-> Tên file có kèm số phiên bản, các bản sau sẽ tăng theo (ví dụ `…_1.1.0_…`). Muốn tự build? Xem [Ứng dụng desktop Windows](#ứng-dụng-desktop-windows).
+> Bản dựng hiện **chưa ký số**, nên Windows SmartScreen có thể cảnh báo *"Windows protected your PC"* ở lần chạy đầu — chọn **More info → Run anyway**. Muốn tự build? Xem [Ứng dụng desktop Windows](#ứng-dụng-desktop-windows).
 
 ## Vòng lặp học thích ứng
 
