@@ -61,6 +61,10 @@ function isDarkBackground(color: string): boolean {
   return Number.parseFloat(match[1]) < 0.55
 }
 
+export function isDarkTheme(theme: Theme): boolean {
+  return isDarkBackground(theme.colors.background)
+}
+
 export const THEMES: Record<string, Theme> = {
   // Minimalist Themes
   minimal_light: {
@@ -491,36 +495,11 @@ export class ThemeManager {
       if (typeof window !== "undefined") {
         localStorage.setItem("typeflow-theme", themeId)
       }
-      this.withThemeCrossfade(themeId, () => this.applyTheme(THEMES[themeId]))
+      // Áp trực tiếp, không crossfade: gắn transition cho toàn bộ cây DOM
+      // khiến trình duyệt tạo hàng nghìn animation mỗi lần đổi theme (lag).
+      this.applyTheme(THEMES[themeId])
       this.notifyListeners(THEMES[themeId])
     }
-  }
-
-  /**
-   * Bọc việc đổi theme trong một lớp crossfade ngắn.
-   * Bỏ qua với theme tương phản cao (flash sẽ khó chịu) và khi người dùng
-   * đã yêu cầu giảm chuyển động.
-   */
-  private withThemeCrossfade(themeId: ThemeId, apply: () => void) {
-    if (typeof document === "undefined") {
-      apply()
-      return
-    }
-
-    const reduced =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-
-    if (reduced || themeId === "high_contrast") {
-      apply()
-      return
-    }
-
-    const root = document.documentElement
-    root.classList.add("theme-transition")
-    apply()
-    window.setTimeout(() => root.classList.remove("theme-transition"), 300)
   }
 
   private applyTheme(theme: Theme) {

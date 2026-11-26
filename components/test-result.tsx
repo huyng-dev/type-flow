@@ -309,7 +309,7 @@ export function TestResult({
             </div>
             <p className="truncate text-[10.5px] leading-none text-muted-foreground/80">
               {extras && nextMilestone
-                ? `Còn ${nextMilestone - extras.bestCombo} ký tự tới mốc ${nextMilestone}`
+                ? `Còn ${nextMilestone - extras.bestCombo} điểm tới mốc ${nextMilestone}`
                 : "Đã chạm mốc combo cao nhất"}
             </p>
           </div>

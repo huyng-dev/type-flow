@@ -79,7 +79,7 @@ export function ComboMeter({ combo, bestCombo, mode, className }: ComboMeterProp
         <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
           <div
             className={cn(
-              "h-full w-full origin-left rounded-full transition-transform duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)]",
+              "h-full w-full origin-left rounded-full",
               TIER_BAR[tier]
             )}
             style={{ transform: `scaleX(${progress})` }}
@@ -87,7 +87,7 @@ export function ComboMeter({ combo, bestCombo, mode, className }: ComboMeterProp
         </div>
         <p className="mt-1 truncate text-[10px] leading-none text-muted-foreground">
           {milestone
-            ? `Còn ${milestone - combo} ký tự tới mốc ${milestone}`
+            ? `Còn ${milestone - combo} điểm tới mốc ${milestone}`
             : "Đã chạm mốc combo cao nhất"}
         </p>
       </div>

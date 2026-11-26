@@ -114,7 +114,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground transition-colors duration-300;
+    @apply bg-background text-foreground;
   }
 
   /* Tailwind v4 không còn đặt cursor: pointer cho control. Dùng :where() để
@@ -363,16 +363,11 @@
   to { stroke-dashoffset: 0; }
 }
 
-/* Crossfade khi đổi theme: gắn tạm vào <html> trong ~300ms.
-   Chỉ áp cho thuộc tính màu, không đụng layout. */
-.theme-transition,
-.theme-transition *,
-.theme-transition *::before,
-.theme-transition *::after {
-  transition-property: background-color, border-color, color, fill, stroke, box-shadow !important;
-  transition-duration: 250ms !important;
-  transition-timing-function: ease !important;
-}
+/* Đổi theme áp dụng tức thì.
+   Trước đây chỗ này có .theme-transition gắn transition màu cho MỌI phần tử
+   (hàng trăm span ký tự trong vùng gõ) trong 250ms; mỗi lần đổi theme trình
+   duyệt phải tạo hàng nghìn animation + tính lại toàn bộ style/paint nên bị
+   khựng rõ rệt. Giờ đổi theme một phát, không crossfade. */
 
 /* Tôn trọng lựa chọn giảm chuyển động của hệ điều hành. */
 @media (prefers-reduced-motion: reduce) {
@@ -401,4 +396,26 @@ body {
   background-attachment: fixed;
   background-size: cover;
   min-height: 100vh;
+}
+
+/* Logo "Flowing": sóng chữ chạy khi hover/focus, mỗi ký tự lệch pha. */
+@keyframes brandWave {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-0.22em);
+  }
+  70% {
+    transform: translateY(0.05em);
+  }
+}
+
+.brand-flowing-letter {
+  display: inline-block;
+}
+
+.brand-logo:is(:hover, :focus-visible) .brand-flowing-letter {
+  animation: brandWave 1000ms ease-in-out infinite;
 }

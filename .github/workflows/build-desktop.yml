@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 env:
-  APP_NAME: Type Flow
-  APP_IDENTIFIER: com.typeflow.app
+  APP_NAME: TypeFlowing
+  APP_IDENTIFIER: com.typeflowing.app
 
 jobs:
   windows:

@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "TypeFlow — Luyện gõ tiếng Việt & English",
+  title: "TypeFlowing — Luyện gõ tiếng Việt & English",
   description: "Luyện gõ phím thông minh với lộ trình thích ứng cho tiếng Việt và tiếng Anh",
   icons: {
     icon: [

@@ -1147,16 +1147,28 @@ export default function TypingGame() {
           <button
             type="button"
             onClick={initializeGame}
-            className="group flex min-w-0 cursor-pointer items-center gap-2 rounded-md text-left transition-[scale,opacity] duration-150 active:duration-75 motion-safe:active:scale-[0.98] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            title="TypeFlow 2.0 - Luyện gõ tiếng Việt & English thông minh (Bấm để bắt đầu bài mới)"
+            className="brand-logo group flex min-w-0 cursor-pointer items-center gap-2 rounded-md text-left transition-[scale,opacity] duration-150 active:duration-75 motion-safe:active:scale-[0.98] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            title="TypeFlowing - Luyện gõ tiếng Việt & English thông minh (Bấm để bắt đầu bài mới)"
           >
             <div className="shrink-0 transition-[translate] duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)] group-hover:-translate-y-0.5">
               <LogoConcept1Isometric size={28} />
             </div>
-            <span className="flex items-center gap-1.5 text-base leading-none font-extrabold tracking-tight text-foreground">
-              Type<span className="text-foreground/75">Flow</span>
-              <span className="rounded-full border border-border/70 bg-muted/50 px-1.5 py-0.5 text-[9px] leading-none font-bold tracking-[0.14em] text-muted-foreground uppercase">
-                2.0
+            <span className="flex items-baseline gap-1.5 text-base leading-none font-extrabold tracking-tight text-foreground">
+              Type
+              <span
+                aria-label="Flowing"
+                className="inline-flex text-[0.72em] leading-none text-foreground/70"
+              >
+                {"Flowing".split("").map((letter, index) => (
+                  <span
+                    key={`${letter}-${index}`}
+                    aria-hidden
+                    className="brand-flowing-letter"
+                    style={{ animationDelay: `${index * 55}ms` }}
+                  >
+                    {letter}
+                  </span>
+                ))}
               </span>
             </span>
           </button>
@@ -1292,9 +1304,9 @@ export default function TypingGame() {
               /* Active Typing Arena & Controls */
               <div className="w-full space-y-5 animate-in fade-in duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)]">
             {/* Config bar — một card duy nhất */}
-            <div className={`flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-border/80 bg-card/70 p-2 shadow-xs backdrop-blur-xs ${focusMode ? "hidden" : ""}`}>
+            <div className={`flex flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-outline-variant/70 bg-surface-container-low p-1.5 shadow-xs ${focusMode ? "hidden" : ""}`}>
               {/* Language Selector */}
-              <div className="flex items-center gap-1 rounded-lg bg-background/60 p-1">
+              <div className="flex items-center gap-1 rounded-xl border border-outline-variant/60 bg-surface-container-lowest px-1 py-1">
                 <Globe className="w-3.5 h-3.5 ml-2 text-muted-foreground" />
                 <SegmentedHighlight className="flex items-center gap-1">
                   <button
@@ -1315,7 +1327,7 @@ export default function TypingGame() {
               </div>
 
               {/* Mode Selector */}
-              <div className="flex items-center gap-1 rounded-lg bg-background/60 p-1">
+              <div className="flex items-center gap-1 rounded-xl border border-outline-variant/60 bg-surface-container-lowest px-1 py-1">
                 <SegmentedHighlight className="flex items-center gap-1">
                   <button
                     onClick={() => handleModeChange("words")}
@@ -1345,7 +1357,7 @@ export default function TypingGame() {
               </div>
 
               {/* Word Count / Time Limit Options */}
-              <div className="flex items-center gap-1 rounded-lg bg-background/60 p-1">
+              <div className="flex items-center gap-1 rounded-xl border border-outline-variant/60 bg-surface-container-lowest px-1 py-1">
                 <SegmentedHighlight className="flex items-center gap-1">
                   {mode === "time"
                     ? [15, 30, 60, 120].map((t) => (
@@ -1375,7 +1387,7 @@ export default function TypingGame() {
               </div>
 
               {/* Difficulty */}
-              <div className="flex items-center gap-1 rounded-lg bg-background/60 p-1">
+              <div className="flex items-center gap-1 rounded-xl border border-outline-variant/60 bg-surface-container-lowest px-1 py-1">
                 <Gauge className="w-3.5 h-3.5 ml-2 text-muted-foreground" />
                 <SegmentedHighlight className="flex items-center gap-1">
                   {(["easy", "medium", "hard"] as DifficultyType[]).map((d) => {
@@ -1410,10 +1422,10 @@ export default function TypingGame() {
                   setAdaptiveMode(nextState);
                   PreferencesManager.savePreferences({ adaptiveMode: nextState });
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-[scale,background-color,border-color,color,box-shadow] duration-150 active:duration-75 motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-[scale,background-color,border-color,color,box-shadow] duration-150 active:duration-75 motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   adaptiveMode
-                    ? "bg-primary/10 border-primary/30 text-primary hover:bg-primary/15"
-                    : "bg-background/80 border-border/60 text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                    ? "bg-primary/10 border-primary/40 text-primary hover:bg-primary/15"
+                    : "bg-surface-container-lowest border-outline-variant/60 text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                 }`}
                 title={
                   adaptiveMode
@@ -1455,17 +1467,6 @@ export default function TypingGame() {
                 </button>
               </div>
             ) : null}
-
-            {/* Live Stats HUD (Realtime) */}
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              <StatTile label="WPM" value={liveStats.wpm} tone="primary" />
-              <StatTile label="Chính xác" value={`${liveStats.accuracy}%`} />
-              <StatTile
-                label={mode === "time" ? "Còn lại" : "Tiến độ"}
-                value={mode === "time" ? `${timeLeft}s` : `${currentWordIndex}/${words.length}`}
-              />
-              <StatTile label="Độ ổn định" value={`${Math.round(liveStats.consistency)}%`} />
-            </div>
 
             {/* AI Real-time Coach Alert Toast */}
             {adaptiveAlert && (
@@ -1634,6 +1635,17 @@ export default function TypingGame() {
               />
             </div>
 
+            {/* Live Stats HUD (Realtime) — đặt dưới vùng gõ để mắt bám chữ, không phải nhảy lên */}
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+              <StatTile label="WPM" value={liveStats.wpm} tone="primary" />
+              <StatTile label="Chính xác" value={`${liveStats.accuracy}%`} />
+              <StatTile
+                label={mode === "time" ? "Còn lại" : "Tiến độ"}
+                value={mode === "time" ? `${timeLeft}s` : `${currentWordIndex}/${words.length}`}
+              />
+              <StatTile label="Độ ổn định" value={`${Math.round(liveStats.consistency)}%`} />
+            </div>
+
             {/* Restart & Action Controls */}
             <div className="flex items-center justify-center gap-3 pt-2">
               <Button
@@ -1682,14 +1694,9 @@ export default function TypingGame() {
 
       {/* Status bar */}
       <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 bg-background/85 px-4 text-[11px] text-muted-foreground">
-        <div className="flex min-w-0 items-center gap-2">
-          <Keyboard className="size-3.5 shrink-0" aria-hidden />
-          <span className="truncate">Bộ gõ: Telex / VNI · Tiếng Việt chuẩn</span>
-          <span aria-hidden className="hidden h-3 w-px bg-border sm:block" />
-          <span className="hidden items-center gap-1.5 sm:inline-flex">
-            <span className="size-1.5 rounded-full bg-success" aria-hidden />
-            Lưu cục bộ
-          </span>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="size-1.5 rounded-full bg-success" aria-hidden />
+          <span className="truncate">Lưu cục bộ</span>
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <span className="hidden items-center gap-1.5 sm:inline-flex">
