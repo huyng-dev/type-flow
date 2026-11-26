@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320" role="img" aria-label="TypeFlowing — luyện gõ tiếng Việt và English theo lộ trình thích ứng">
+  <defs>
+    <linearGradient id="tfBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#04281a"/>
+      <stop offset="0.55" stop-color="#0a3a25"/>
+      <stop offset="1" stop-color="#0e4a2f"/>
+    </linearGradient>
+    <linearGradient id="tfAccent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#34d399"/>
+      <stop offset="1" stop-color="#a3e635"/>
+    </linearGradient>
+    <radialGradient id="tfGlow" cx="0.82" cy="0.28" r="0.7">
+      <stop offset="0" stop-color="#34d399" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#34d399" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="tfKey" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22c55e"/>
+      <stop offset="1" stop-color="#0f7a3d"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="320" rx="24" fill="url(#tfBg)"/>
+  <rect x="0" y="0" width="1200" height="320" rx="24" fill="url(#tfGlow)"/>
+
+  <!-- faint flow waves -->
+  <g stroke="#34d399" stroke-opacity="0.10" fill="none" stroke-width="1.5">
+    <path d="M -40 300 C 220 250, 420 340, 700 268 S 1080 208, 1260 258"/>
+    <path d="M -40 322 C 240 272, 460 356, 740 290 S 1100 232, 1260 282"/>
+  </g>
+
+  <!-- dotted key grid, bottom-right -->
+  <g fill="#a7f3d0" fill-opacity="0.10">
+    <circle cx="1108" cy="292" r="2.4"/><circle cx="1132" cy="292" r="2.4"/><circle cx="1156" cy="292" r="2.4"/>
+    <circle cx="1108" cy="310" r="2.4"/><circle cx="1132" cy="310" r="2.4"/><circle cx="1156" cy="310" r="2.4"/>
+  </g>
+
+  <!-- logo mark: key cap with caret -->
+  <g>
+    <rect x="64" y="62" width="56" height="56" rx="14" fill="url(#tfKey)"/>
+    <rect x="64" y="62" width="56" height="56" rx="14" fill="none" stroke="#a7f3d0" stroke-opacity="0.35"/>
+    <rect x="88" y="76" width="4" height="28" rx="2" fill="#ecfdf5"/>
+    <rect x="80" y="106" width="20" height="3.4" rx="1.7" fill="#ecfdf5" fill-opacity="0.85"/>
+  </g>
+
+  <!-- brand -->
+  <text x="132" y="108" font-family="'Segoe UI',Inter,system-ui,-apple-system,sans-serif" font-size="56" font-weight="800" letter-spacing="-1.6" fill="#ecfdf5">Type<tspan font-size="33" font-weight="700" fill="#a7f3d0" dx="4">Flowing</tspan></text>
+
+  <!-- tagline -->
+  <text x="64" y="172" font-family="'Segoe UI',Inter,system-ui,-apple-system,sans-serif" font-size="21" font-weight="600" fill="#ecfdf5" fill-opacity="0.94">Luyện gõ tiếng Việt &amp; English theo lộ trình thích ứng</text>
+  <text x="64" y="200" font-family="'Segoe UI',Inter,system-ui,-apple-system,sans-serif" font-size="15" fill="#ecfdf5" fill-opacity="0.62">Next.js · Tauri / WebView2 · Hoạt động 100% ngoại tuyến, dữ liệu lưu cục bộ</text>
+
+  <!-- chips -->
+  <g font-family="'Segoe UI',Inter,system-ui,-apple-system,sans-serif" font-size="13" font-weight="600">
+    <rect x="64" y="228" width="188" height="32" rx="16" fill="#ecfdf5" fill-opacity="0.08" stroke="#a7f3d0" stroke-opacity="0.22"/>
+    <text x="82" y="249" fill="#d1fae5">Words · Time · Phrases</text>
+    <rect x="264" y="228" width="176" height="32" rx="16" fill="#ecfdf5" fill-opacity="0.08" stroke="#a7f3d0" stroke-opacity="0.22"/>
+    <text x="282" y="249" fill="#d1fae5">English · Tiếng Việt</text>
+    <rect x="452" y="228" width="150" height="32" rx="16" fill="#ecfdf5" fill-opacity="0.08" stroke="#a7f3d0" stroke-opacity="0.22"/>
+    <text x="470" y="249" fill="#d1fae5">AI thích ứng</text>
+  </g>
+
+  <!-- mock workspace card -->
+  <g>
+    <rect x="672" y="48" width="480" height="224" rx="18" fill="#ecfdf5" fill-opacity="0.06" stroke="#86efac" stroke-opacity="0.22"/>
+    <rect x="672" y="48" width="480" height="224" rx="18" fill="none" stroke="#04281a" stroke-opacity="0.25"/>
+
+    <!-- header -->
+    <rect x="692" y="64" width="66" height="24" rx="12" fill="#34d399" fill-opacity="0.18" stroke="#34d399" stroke-opacity="0.4"/>
+    <text x="705" y="80" font-family="'Segoe UI',Inter,system-ui,sans-serif" font-size="12" font-weight="700" fill="#a7f3d0">Words</text>
+    <text x="1132" y="80" text-anchor="end" font-family="'Segoe UI',Inter,system-ui,sans-serif" font-size="12" font-weight="600" fill="#ecfdf5" fill-opacity="0.55">AI Adaptive · EASY</text>
+
+    <!-- typing line -->
+    <text x="692" y="134" font-family="'Cascadia Code','Consolas','SFMono-Regular',ui-monospace,monospace" font-size="20">
+      <tspan fill="#6ee7b7">gõ đúng</tspan>
+      <tspan fill="#ecfdf5" fill-opacity="0.45">&#160;</tspan>
+      <tspan fill="#ecfdf5" fill-opacity="0.5">từng phím mỗi ngày</tspan>
+    </text>
+    <rect x="788" y="114" width="3" height="26" rx="1.5" fill="#a3e635"/>
+
+    <!-- progress -->
+    <rect x="692" y="158" width="440" height="8" rx="4" fill="#ecfdf5" fill-opacity="0.14"/>
+    <rect x="692" y="158" width="278" height="8" rx="4" fill="url(#tfAccent)"/>
+    <text x="692" y="184" font-family="'Segoe UI',Inter,system-ui,sans-serif" font-size="11" font-weight="600" fill="#ecfdf5" fill-opacity="0.6">Combo 42 · ×2.5</text>
+
+    <!-- stat tiles -->
+    <g font-family="'Segoe UI',Inter,system-ui,sans-serif">
+      <rect x="692" y="196" width="138" height="58" rx="12" fill="#ecfdf5" fill-opacity="0.06"/>
+      <text x="708" y="218" font-size="10.5" font-weight="600" letter-spacing="1" fill="#ecfdf5" fill-opacity="0.55">WPM</text>
+      <text x="708" y="246" font-size="22" font-weight="800" fill="#ecfdf5">78</text>
+
+      <rect x="842" y="196" width="138" height="58" rx="12" fill="#ecfdf5" fill-opacity="0.06"/>
+      <text x="858" y="218" font-size="10.5" font-weight="600" letter-spacing="1" fill="#ecfdf5" fill-opacity="0.55">CHÍNH XÁC</text>
+      <text x="858" y="246" font-size="22" font-weight="800" fill="#ecfdf5">97%</text>
+
+      <rect x="992" y="196" width="140" height="58" rx="12" fill="#ecfdf5" fill-opacity="0.06"/>
+      <text x="1008" y="218" font-size="10.5" font-weight="600" letter-spacing="1" fill="#ecfdf5" fill-opacity="0.55">COMBO</text>
+      <text x="1008" y="246" font-size="22" font-weight="800" fill="#a3e635">×2.5</text>
+    </g>
+  </g>
+</svg>
