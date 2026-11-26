@@ -21,8 +21,14 @@ rồi tự điều chỉnh độ khó cùng danh sách từ dựa trên chính l
 [![Ngoại tuyến](https://img.shields.io/badge/ngoại_tuyến-100%25-52525b?style=flat-square)](#dữ-liệu--quyền-riêng-tư)
 
 [![Stars](https://img.shields.io/github/stars/huyng-dev/type-flow?style=flat-square&color=18181b)](https://github.com/huyng-dev/type-flow/stargazers)
+[![Release](https://img.shields.io/github/v/release/huyng-dev/type-flow?style=flat-square&color=18181b)](https://github.com/huyng-dev/type-flow/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/huyng-dev/type-flow/total?style=flat-square&color=52525b)](https://github.com/huyng-dev/type-flow/releases)
 [![Last commit](https://img.shields.io/github/last-commit/huyng-dev/type-flow?style=flat-square)](https://github.com/huyng-dev/type-flow/commits/master)
 [![Build desktop app](https://github.com/huyng-dev/type-flow/actions/workflows/build-desktop.yml/badge.svg)](https://github.com/huyng-dev/type-flow/actions/workflows/build-desktop.yml)
+
+<br />
+
+[![Tải về cho Windows x64](https://img.shields.io/badge/Tải_về_cho_Windows-x64-18181b?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/huyng-dev/type-flow/releases/latest)
 
 </div>
 
@@ -32,6 +38,7 @@ rồi tự điều chỉnh độ khó cùng danh sách từ dựa trên chính l
 
 - [TypeFlowing là gì?](#typeflowing-là-gì)
 - [Điểm nổi bật](#điểm-nổi-bật)
+- [Tải về](#tải-về)
 - [Vòng lặp học thích ứng](#vòng-lặp-học-thích-ứng)
 - [Công nghệ sử dụng](#công-nghệ-sử-dụng)
 - [Cài đặt & chạy bản web](#cài-đặt--chạy-bản-web)
@@ -78,6 +85,20 @@ TypeFlowing là một **phòng luyện gõ phím** dành cho người Việt, ch
 
 </div>
 
+## Tải về
+
+Bản dựng sẵn cho **Windows x64** nằm ở [trang Releases](https://github.com/huyng-dev/type-flow/releases/latest) — mở mục **Assets** của bản mới nhất và chọn file phù hợp:
+
+| File | Khi nào dùng |
+| :-- | :-- |
+| `TypeFlowing_1.0.0_x64_en-US.msi` | Cài đặt chuẩn qua Windows Installer — có shortcut trong Start Menu, gỡ cài trong *Apps & features* |
+| `TypeFlowing_1.0.0_x64-setup.exe` | Trình cài dạng EXE, tương đương bản MSI |
+| `TypeFlowing.exe` | Bản **portable** — chạy trực tiếp, không cần cài đặt |
+
+**Yêu cầu:** Windows 10/11 64-bit và **WebView2 Runtime** (đã có sẵn trên Windows 11 và hầu hết Windows 10).
+
+> Tên file có kèm số phiên bản, các bản sau sẽ tăng theo (ví dụ `…_1.1.0_…`). Muốn tự build? Xem [Ứng dụng desktop Windows](#ứng-dụng-desktop-windows).
+
 ## Vòng lặp học thích ứng
 
 Đây là phần "não" của ứng dụng — mỗi phiên gõ đều nuôi cho phiên tiếp theo:
@@ -97,7 +118,8 @@ flowchart LR
 flowchart LR
     S["npm run build"] --> O["Static export → out/"]
     O --> P["Pake / Tauri + WebView2"]
-    P --> W["typeflowing-1.0-windows-x64<br/>(.msi / .exe)"]
+    P --> W["Windows x64<br/>.msi / .exe"]
+    W --> R["GitHub Release<br/>tag v*"]
 ```
 
 ## Công nghệ sử dụng
@@ -138,23 +160,34 @@ Thư mục `out/` là một site tĩnh hoàn chỉnh, có thể deploy lên GitH
 
 Ứng dụng desktop được tạo bằng **Pake** (Tauri + WebView2) từ chính bản export tĩnh — nhẹ, khởi động nhanh, không kèm Chromium.
 
-**Cách 1 — Build qua GitHub Actions (khuyến nghị, không cần cài Rust):**
+**Cách 1 — Tải bản dựng sẵn (nhanh nhất):**
 
-1. Vào tab **Actions → Build desktop app → Run workflow**, hoặc đẩy một tag `v*`:
+Vào [trang Releases](https://github.com/huyng-dev/type-flow/releases/latest) và chọn file theo bảng ở mục [Tải về](#tải-về).
+
+**Cách 2 — Build qua GitHub Actions (không cần cài Rust):**
+
+1. Đẩy một tag phiên bản để vừa build vừa tạo Release:
    ```bash
-   git tag v1.0.0 && git push origin v1.0.0
+   git tag v1.0.0
+   git push origin v1.0.0
    ```
-2. Khi job hoàn tất, tải artifact **`typeflowing-1.0-windows-x64`** trong trang của lần chạy đó.
+   Hoặc chạy thủ công ở **Actions → Build desktop app → Run workflow** (cách này chỉ tạo artifact, không tạo Release).
+2. Workflow sẽ xuất bản tĩnh, đóng gói bằng Pake rồi:
+   - đính kèm `.msi` / `.exe` vào **GitHub Release** nếu bạn đẩy tag;
+   - luôn lưu thêm artifact **`typeflowing-1.0-windows-x64`** trong trang của lần chạy.
 3. Giải nén và chạy file `.msi` hoặc `.exe`.
 
-**Cách 2 — Build tại máy (cần Rust + Visual Studio Build Tools):**
+> **Phân biệt nhanh:** *artifact* là bản nháp trong tab Actions (chỉ chủ repo thấy, GitHub có thể xoá sau ~90 ngày). *Release* là bản công khai, có link tải vĩnh viễn — đây mới là thứ nên đưa cho người dùng.
+
+**Cách 3 — Build tại máy (cần Rust + Visual Studio Build Tools):**
 
 ```bash
 npm run build
 npm install --global pake-cli
 pake ./out --name TypeFlowing --identifier com.typeflowing.app \
-  --icon ./desktop/icon.png --width 1360 --height 900 \
-  --min-width 1080 --min-height 680 --targets x64
+  --app-version 1.0.0 --icon ./desktop/icon.png \
+  --width 1360 --height 900 --min-width 1080 --min-height 680 \
+  --targets x64 --keep-binary
 ```
 
 Cửa sổ mặc định **1360 × 900** (tối thiểu 1080 × 680) để bảng **Inspector** hiển thị song song bên cạnh vùng gõ.
@@ -205,6 +238,7 @@ type-flow/
 - **Chạy hoàn toàn ngoại tuyến.** Sau lần tải đầu tiên, ứng dụng không cần Internet.
 - **Bạn kiểm soát dữ liệu.** Có thể xuất toàn bộ thống kê ra JSON (`typeflow-stats-YYYY-MM-DD.json`) từ bảng thống kê.
 - Xoá dữ liệu trình duyệt hoặc bộ nhớ ứng dụng sẽ xoá luôn tiến độ luyện tập.
+- Bản desktop dùng **hồ sơ WebView2 riêng**, không dùng chung dữ liệu với bản web trên cùng máy.
 
 ## Đóng góp
 
