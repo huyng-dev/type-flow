@@ -20,15 +20,15 @@ rồi tự điều chỉnh độ khó cùng danh sách từ dựa trên chính l
 [![Version](https://img.shields.io/badge/version-1.0-18181b?style=flat-square)](#)
 [![Ngoại tuyến](https://img.shields.io/badge/ngoại_tuyến-100%25-52525b?style=flat-square)](#dữ-liệu--quyền-riêng-tư)
 
-[![Stars](https://img.shields.io/github/stars/huyng-dev/type-flow?style=flat-square&color=18181b)](https://github.com/huyng-dev/type-flow/stargazers)
-[![Release](https://img.shields.io/github/v/release/huyng-dev/type-flow?style=flat-square&color=18181b)](https://github.com/huyng-dev/type-flow/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/huyng-dev/type-flow/total?style=flat-square&color=52525b)](https://github.com/huyng-dev/type-flow/releases)
-[![Last commit](https://img.shields.io/github/last-commit/huyng-dev/type-flow?style=flat-square)](https://github.com/huyng-dev/type-flow/commits/master)
-[![Build desktop app](https://github.com/huyng-dev/type-flow/actions/workflows/build-desktop.yml/badge.svg)](https://github.com/huyng-dev/type-flow/actions/workflows/build-desktop.yml)
+[![Stars](https://img.shields.io/github/stars/huyng-dev/type-flowing?style=flat-square&color=18181b)](https://github.com/huyng-dev/type-flowing/stargazers)
+[![Release](https://img.shields.io/github/v/release/huyng-dev/type-flowing?style=flat-square&color=18181b)](https://github.com/huyng-dev/type-flowing/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/huyng-dev/type-flowing/total?style=flat-square&color=52525b)](https://github.com/huyng-dev/type-flowing/releases)
+[![Last commit](https://img.shields.io/github/last-commit/huyng-dev/type-flowing?style=flat-square)](https://github.com/huyng-dev/type-flowing/commits/master)
+[![Build desktop app](https://github.com/huyng-dev/type-flowing/actions/workflows/build-desktop.yml/badge.svg)](https://github.com/huyng-dev/type-flowing/actions/workflows/build-desktop.yml)
 
 <br />
 
-[![Tải về cho Windows x64](https://img.shields.io/badge/Tải_về_cho_Windows-x64-18181b?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/huyng-dev/type-flow/releases/latest)
+[![Tải về cho Windows x64](https://img.shields.io/badge/Tải_về_cho_Windows-x64-18181b?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/huyng-dev/type-flowing/releases/latest)
 
 </div>
 
@@ -87,7 +87,7 @@ TypeFlowing là một **phòng luyện gõ phím** dành cho người Việt, ch
 
 ## Tải về
 
-Bản dựng sẵn cho **Windows x64** nằm ở [trang Releases](https://github.com/huyng-dev/type-flow/releases/latest) — mở mục **Assets** của bản mới nhất và chọn file phù hợp:
+Bản dựng sẵn cho **Windows x64** nằm ở [trang Releases](https://github.com/huyng-dev/type-flowing/releases/latest) — mở mục **Assets** của bản mới nhất và chọn file phù hợp:
 
 | File | Khi nào dùng |
 | :-- | :-- |
@@ -162,7 +162,7 @@ Thư mục `out/` là một site tĩnh hoàn chỉnh, có thể deploy lên GitH
 
 **Cách 1 — Tải bản dựng sẵn (nhanh nhất):**
 
-Vào [trang Releases](https://github.com/huyng-dev/type-flow/releases/latest) và chọn file theo bảng ở mục [Tải về](#tải-về).
+Vào [trang Releases](https://github.com/huyng-dev/type-flowing/releases/latest) và chọn file theo bảng ở mục [Tải về](#tải-về).
 
 **Cách 2 — Build qua GitHub Actions (không cần cài Rust):**
 
@@ -249,11 +249,11 @@ Mọi ý tưởng và báo lỗi đều được hoan nghênh:
 3. Commit theo [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`…).
 4. Mở Pull Request mô tả rõ thay đổi.
 
-Nếu gặp lỗi, vui lòng mở [Issue](https://github.com/huyng-dev/type-flow/issues) kèm trình duyệt hoặc phiên bản Windows và các bước tái hiện.
+Nếu gặp lỗi, vui lòng mở [Issue](https://github.com/huyng-dev/type-flowing/issues) kèm trình duyệt hoặc phiên bản Windows và các bước tái hiện.
 
 ## Giấy phép
 
-Kho mã nguồn hiện **chưa kèm tệp giấy phép chính thức**. Nếu bạn muốn dùng lại, phân phối hoặc đóng góp, hãy liên hệ trước qua [Issue](https://github.com/huyng-dev/type-flow/issues) để thống nhất điều khoản.
+Kho mã nguồn hiện **chưa kèm tệp giấy phép chính thức**. Nếu bạn muốn dùng lại, phân phối hoặc đóng góp, hãy liên hệ trước qua [Issue](https://github.com/huyng-dev/type-flowing/issues) để thống nhất điều khoản.
 
 ## Lời cảm ơn
 
