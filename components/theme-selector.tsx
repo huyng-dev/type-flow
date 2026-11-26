@@ -46,11 +46,11 @@ const THEME_HINTS: Record<string, string> = {
 export function ThemeSelector({ className }: { className?: string }) {
   // Render đầu tiên dùng theme mặc định để khớp HTML từ server; theme đã lưu
   // được áp trong useEffect bên dưới.
-  const [currentTheme, setCurrentTheme] = useState<Theme>(THEMES.forest_green)
+  const [currentTheme, setCurrentTheme] = useState<Theme>(THEMES.minimal_light)
   const [isOpen, setIsOpen] = useState(false)
   const [filter, setFilter] = useState<ToneFilter>("all")
   // Theme nháp: chỉ áp dụng khi bấm "Áp dụng", không đổi ngay khi bấm card.
-  const [draftId, setDraftId] = useState<ThemeId>("forest_green")
+  const [draftId, setDraftId] = useState<ThemeId>("minimal_light")
 
   useEffect(() => {
     const savedPreferences = PreferencesManager.getPreferences()

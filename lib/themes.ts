@@ -468,7 +468,7 @@ export const THEMES: Record<string, Theme> = {
 export type ThemeId = keyof typeof THEMES
 
 export class ThemeManager {
-  private currentTheme: ThemeId = "forest_green"
+  private currentTheme: ThemeId = "minimal_light"
   private listeners: ((theme: Theme) => void)[] = []
 
   constructor() {

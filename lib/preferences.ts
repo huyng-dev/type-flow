@@ -22,7 +22,7 @@ export class PreferencesManager {
   private static readonly STORAGE_KEY = "typeflow-preferences";
 
   private static readonly DEFAULT_PREFERENCES: UserPreferences = {
-    theme: "forest_green",
+    theme: "minimal_light",
     language: "english",
     difficulty: "medium",
     contentType: "words",

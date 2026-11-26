@@ -4,46 +4,46 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Default theme (Forest Green) */
-  --background: oklch(0.98 0.01 142);
-  --foreground: oklch(0.2 0.05 142);
-  --card: oklch(0.96 0.02 142);
-  --card-foreground: oklch(0.2 0.05 142);
-  --popover: oklch(0.98 0.01 142);
-  --popover-foreground: oklch(0.2 0.05 142);
-  --primary: oklch(0.35 0.12 142);
-  --primary-foreground: oklch(0.98 0.01 142);
-  --secondary: oklch(0.75 0.08 85);
-  --secondary-foreground: oklch(0.2 0.05 142);
-  --muted: oklch(0.94 0.02 142);
-  --muted-foreground: oklch(0.45 0.05 142);
-  --accent: oklch(0.65 0.15 85);
-  --accent-foreground: oklch(0.98 0.01 142);
+  /* Default theme (Minimal Light) — khớp THEMES.minimal_light trong lib/themes.ts */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.15 0 0);
+  --card: oklch(0.99 0 0);
+  --card-foreground: oklch(0.15 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0 0);
+  --primary: oklch(0.15 0 0);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0 0);
+  --secondary-foreground: oklch(0.15 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.45 0 0);
+  --accent: oklch(0.92 0 0);
+  --accent-foreground: oklch(0.15 0 0);
   --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.98 0.01 142);
+  --destructive-foreground: oklch(1 0 0);
   --success: oklch(0.52 0.14 150);
   --success-foreground: oklch(0.99 0.01 150);
-  --warning: oklch(0.62 0.14 65);
-  --warning-foreground: oklch(0.2 0.04 65);
+  --warning: oklch(0.6 0.14 65);
+  --warning-foreground: oklch(1 0.01 65);
   --info: oklch(0.55 0.12 250);
   --info-foreground: oklch(0.99 0.01 250);
-  --border: oklch(0.88 0.03 142);
-  --input: oklch(0.96 0.02 142);
-  --ring: oklch(0.35 0.12 142 / 0.4);
+  --border: oklch(0.92 0 0);
+  --input: oklch(0.99 0 0);
+  --ring: oklch(0.15 0 0 / 0.3);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.5rem;
-  --sidebar: oklch(0.98 0.01 142);
-  --sidebar-foreground: oklch(0.2 0.05 142);
-  --sidebar-primary: oklch(0.96 0.02 142);
-  --sidebar-primary-foreground: oklch(0.2 0.05 142);
-  --sidebar-accent: oklch(0.75 0.08 85);
-  --sidebar-accent-foreground: oklch(0.98 0.01 142);
-  --sidebar-border: oklch(0.88 0.03 142);
-  --sidebar-ring: oklch(0.35 0.12 142 / 0.4);
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.15 0 0);
+  --sidebar-primary: oklch(0.99 0 0);
+  --sidebar-primary-foreground: oklch(0.15 0 0);
+  --sidebar-accent: oklch(0.95 0 0);
+  --sidebar-accent-foreground: oklch(0.15 0 0);
+  --sidebar-border: oklch(0.92 0 0);
+  --sidebar-ring: oklch(0.15 0 0 / 0.3);
 }
 
 /* Elevation ladder — suy ra từ token của theme đang bật (không hard-code màu),
