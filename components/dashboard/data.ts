@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react"
 import {
   adaptiveAlgorithm,
   type AdaptiveStats,
+  type MistakeSummaryEntry,
   type PerformanceTrends,
   type SkillAssessment,
 } from "@/lib/adaptive-algorithm"
@@ -45,6 +46,14 @@ export const TIME_RANGES: { value: TimeRange; label: string }[] = [
   { value: 365, label: "1 năm" },
 ]
 
+/** Một ngày trong lịch hoạt động (heatmap). */
+export interface ActivityDay {
+  /** Khoá ngày theo giờ máy, dạng YYYY-MM-DD. */
+  date: string
+  sessions: number
+  words: number
+}
+
 export interface DifficultyStat {
   difficulty: "easy" | "medium" | "hard"
   sessions: number
@@ -59,6 +68,8 @@ export interface DashboardData {
   languages: LanguageStats[]
   progress: ProgressPoint[]
   sessions: GameSession[]
+  activity: ActivityDay[]
+  mistakes: MistakeSummaryEntry[]
   difficulty: DifficultyStat[]
   leaderboard: ScoreEntry[]
   bests: PersonalBests
@@ -73,6 +84,42 @@ export interface DashboardData {
 }
 
 const DIFFICULTIES: DifficultyStat["difficulty"][] = ["easy", "medium", "hard"]
+
+/** 18 tuần gần nhất — vừa đủ để thấy nhịp luyện mà không phải cuộn ngang. */
+const ACTIVITY_DAYS = 126
+
+function toDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function buildActivity(sessions: GameSession[]): ActivityDay[] {
+  const byDay = new Map<string, { sessions: number; words: number }>()
+
+  for (const session of sessions) {
+    const key = toDateKey(new Date(session.timestamp))
+    const current = byDay.get(key) ?? { sessions: 0, words: 0 }
+    current.sessions += 1
+    current.words += session.wordCount ?? 0
+    byDay.set(key, current)
+  }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const days: ActivityDay[] = []
+  for (let offset = ACTIVITY_DAYS - 1; offset >= 0; offset--) {
+    const date = new Date(today)
+    date.setDate(today.getDate() - offset)
+    const key = toDateKey(date)
+    const value = byDay.get(key)
+    days.push({ date: key, sessions: value?.sessions ?? 0, words: value?.words ?? 0 })
+  }
+
+  return days
+}
 
 function buildDifficultyStats(sessions: GameSession[]): DifficultyStat[] {
   return DIFFICULTIES.map((difficulty) => {
@@ -126,6 +173,8 @@ export function buildDashboardData(range: TimeRange): DashboardData {
     languages: StatisticsManager.getLanguageStats(),
     progress: StatisticsManager.getProgressData(range),
     sessions: StatisticsManager.getRecentSessions(range),
+    activity: buildActivity(allSessions),
+    mistakes: adaptiveAlgorithm.getMistakeSummary(6),
     difficulty: buildDifficultyStats(allSessions),
     leaderboard: scoringSystem.getLeaderboard(20),
     bests: scoringSystem.getPersonalBests(),

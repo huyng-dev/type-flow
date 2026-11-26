@@ -27,6 +27,18 @@ export interface PerformanceMetrics {
   sessionLength: number; // Thời lượng thực tế (phút)
 }
 
+/** Một cặp gõ nhầm: phím đích → phím đã gõ. */
+export interface MistakeSummaryEntry {
+  target: string;
+  typed: string;
+  count: number;
+}
+
+export interface WeakWordEntry {
+  word: string;
+  count: number;
+}
+
 export interface SkillAssessment {
   overallLevel: "beginner" | "intermediate" | "advanced" | "expert";
   wpmLevel: number; // Thang điểm 1-10
@@ -393,6 +405,44 @@ export class AdaptiveAlgorithm {
       bestAccuracy,
       improvementRate,
     };
+  }
+
+  /**
+   * Gộp lỗi gõ nhầm từ toàn bộ lịch sử học thích ứng — dùng cho dashboard.
+   * Chỉ có dữ liệu khi người dùng bật chế độ AI Adaptive.
+   */
+  getMistakeSummary(limit = 6): MistakeSummaryEntry[] {
+    const totals: Record<string, number> = {};
+
+    for (const entry of this.performanceHistory) {
+      for (const [pair, count] of Object.entries(entry.commonErrors || {})) {
+        totals[pair] = (totals[pair] || 0) + count;
+      }
+    }
+
+    return Object.entries(totals)
+      .map(([pair, count]) => {
+        const [target = "", typed = ""] = pair.split("->");
+        return { target, typed, count };
+      })
+      .filter((item) => item.target.length > 0 && item.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
+  }
+
+  getWeakWords(limit = 12): WeakWordEntry[] {
+    const totals: Record<string, number> = {};
+
+    for (const entry of this.performanceHistory) {
+      for (const [word, count] of Object.entries(entry.weakWords || {})) {
+        totals[word] = (totals[word] || 0) + count;
+      }
+    }
+
+    return Object.entries(totals)
+      .map(([word, count]) => ({ word, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
   }
 
   /**

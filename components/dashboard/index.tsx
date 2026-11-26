@@ -32,6 +32,8 @@ export interface DashboardProps {
   initialTab?: DashboardTab
   newAchievements?: Achievement[]
   score?: ScoreEntry
+  /** Bắt đầu bài luyện tập trung vào một phím hay gõ sai. */
+  onDrill?: (char: string) => void
 }
 
 export function Dashboard({
@@ -40,6 +42,7 @@ export function Dashboard({
   initialTab = "overview",
   newAchievements = [],
   score,
+  onDrill,
 }: DashboardProps) {
   const { data, range, setRange, refresh } = useDashboardData()
   const [tab, setTab] = useState<DashboardTab>(initialTab)
@@ -70,13 +73,13 @@ export function Dashboard({
           onValueChange={(value) => setTab(value as DashboardTab)}
           className="flex min-h-0 flex-1 flex-col gap-0"
         >
-          <div className="shrink-0 border-b border-border/70 px-6 py-2.5">
-            <TabsList className="grid h-auto w-full grid-cols-3 gap-1 rounded-xl bg-muted/50 p-1 @xl/dialog:grid-cols-5">
+          <div className="shrink-0 border-b border-border/70 px-6">
+            <TabsList className="grid h-auto w-full grid-cols-3 gap-0 rounded-none bg-transparent p-0 @xl/dialog:grid-cols-5">
               {DASHBOARD_TABS.map((item) => (
                 <TabsTrigger
                   key={item.value}
                   value={item.value}
-                  className="h-8 rounded-lg text-[11.5px] font-semibold"
+                  className="relative h-10 rounded-none border-0 bg-transparent px-2 text-[11.5px] font-semibold text-muted-foreground shadow-none hover:text-foreground data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none after:pointer-events-none after:absolute after:inset-x-2 after:bottom-0 after:h-[2px] after:rounded-full after:bg-primary after:opacity-0 data-[state=active]:after:opacity-100"
                 >
                   {item.label}
                 </TabsTrigger>
@@ -87,7 +90,12 @@ export function Dashboard({
           <DialogBody>
             <TabsContent value="overview" className="mt-0 space-y-4 focus-visible:outline-none">
               {score ? <LatestScorePanel score={score} /> : null}
-              <OverviewPanel data={data} newAchievements={newAchievements} onNavigate={setTab} />
+              <OverviewPanel
+                data={data}
+                newAchievements={newAchievements}
+                onNavigate={setTab}
+                onDrill={onDrill}
+              />
             </TabsContent>
 
             <TabsContent value="progress" className="mt-0 space-y-4 focus-visible:outline-none">
@@ -111,7 +119,7 @@ export function Dashboard({
 
         <DialogFooter>
           <p className={cn("mr-auto text-[11px] text-muted-foreground")}>
-            Dữ liệu được lưu cục bộ trên trình duyệt này
+            Dữ liệu được lưu cục bộ trên thiết bị này
           </p>
           <Button variant="ghost" size="sm" className="gap-1.5" onClick={refresh}>
             <RefreshCw className="size-3.5" aria-hidden />

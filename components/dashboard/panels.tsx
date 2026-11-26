@@ -3,13 +3,16 @@
 import { useRef, useState, type ReactNode } from "react"
 import {
   Activity,
+  ArrowRight,
   Award,
   BarChart3,
   Brain,
+  CalendarDays,
   Check,
   Download,
   Flame,
   Gauge,
+  Keyboard,
   Lightbulb,
   Minus,
   Sparkles,
@@ -25,7 +28,7 @@ import {
 import { AchievementBadge } from "@/components/achievement-icon"
 import { EmptyState, Meter, Panel, Sparkline, StatTile, toneTextClass } from "@/components/data-display"
 import { Button } from "@/components/ui/button"
-import { adaptiveAlgorithm } from "@/lib/adaptive-algorithm"
+import { adaptiveAlgorithm, type MistakeSummaryEntry } from "@/lib/adaptive-algorithm"
 import { EngagementManager } from "@/lib/engagement"
 import {
   scoringSystem,
@@ -35,7 +38,7 @@ import {
 import { StatisticsManager } from "@/lib/statistics"
 import { cn } from "@/lib/utils"
 
-import { TIME_RANGES, type DashboardData, type DashboardTab, type TimeRange } from "./data"
+import { TIME_RANGES, type ActivityDay, type DashboardData, type DashboardTab, type TimeRange } from "./data"
 
 const LANGUAGE_LABEL: Record<string, string> = {
   english: "English",
@@ -111,16 +114,194 @@ function SessionRow({ session }: { session: DashboardData["sessions"][number] })
   )
 }
 
+const WEEKDAY_LABELS = ["T2", "", "T4", "", "T6", "", "CN"]
+
+const HEAT_LEVELS = [
+  "bg-muted/60",
+  "bg-primary/20",
+  "bg-primary/40",
+  "bg-primary/60",
+  "bg-primary/85",
+] as const
+
+function heatLevel(sessions: number) {
+  if (sessions <= 0) return 0
+  if (sessions === 1) return 1
+  if (sessions === 2) return 2
+  if (sessions <= 4) return 3
+  return 4
+}
+
+function formatDayLabel(key: string) {
+  const [, month, day] = key.split("-")
+  return `${day}/${month}`
+}
+
+/** Lịch hoạt động 18 tuần: mỗi cột một tuần, mỗi ô một ngày. */
+function ActivityHeatmap({ days }: { days: ActivityDay[] }) {
+  const first = days[0]
+  // getDay(): CN = 0 → đổi sang thứ tự bắt đầu từ thứ Hai.
+  const leading = first ? (new Date(`${first.date}T00:00:00`).getDay() + 6) % 7 : 0
+  const cells: (ActivityDay | null)[] = [
+    ...(new Array<null>(leading).fill(null) as null[]),
+    ...days,
+  ]
+  const weeks: (ActivityDay | null)[][] = []
+  for (let index = 0; index < cells.length; index += 7) {
+    weeks.push(cells.slice(index, index + 7))
+  }
+
+  return (
+    <div className="flex gap-2">
+      <div className="flex flex-col justify-between text-[9.5px] text-muted-foreground/80">
+        {WEEKDAY_LABELS.map((label, index) => (
+          <span key={index} className="flex h-3.5 items-center leading-none">
+            {label}
+          </span>
+        ))}
+      </div>
+      <div className="flex min-w-0 gap-1 overflow-x-auto pb-1">
+        {weeks.map((week, weekIndex) => (
+          <div key={weekIndex} className="flex flex-col gap-1">
+            {week.map((day, dayIndex) =>
+              day ? (
+                <span
+                  key={day.date}
+                  title={`${formatDayLabel(day.date)} · ${day.sessions} phiên · ${formatNumber(day.words)} từ`}
+                  className={cn(
+                    "size-3.5 rounded-[4px] border border-outline-variant/40",
+                    HEAT_LEVELS[heatLevel(day.sessions)]
+                  )}
+                />
+              ) : (
+                <span key={`empty-${dayIndex}`} className="size-3.5" aria-hidden />
+              )
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function HeatLegend() {
+  return (
+    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+      <span>Ít</span>
+      {HEAT_LEVELS.map((style, index) => (
+        <span
+          key={index}
+          className={cn("size-2.5 rounded-[3px] border border-outline-variant/40", style)}
+        />
+      ))}
+      <span>Nhiều</span>
+    </div>
+  )
+}
+
+function SkillSnapshot({ data }: { data: DashboardData }) {
+  const { skill } = data
+
+  return (
+    <Panel title="Kỹ năng hiện tại" description="Thang 1–10 theo dữ liệu gần đây">
+      <div className="space-y-3">
+        <Meter
+          label="Tốc độ"
+          value={skill.wpmLevel}
+          max={10}
+          valueLabel={`${skill.wpmLevel}/10`}
+          tone={skill.wpmLevel >= 7 ? "success" : skill.wpmLevel >= 4 ? "warning" : "destructive"}
+        />
+        <Meter
+          label="Độ chính xác"
+          value={skill.accuracyLevel}
+          max={10}
+          valueLabel={`${skill.accuracyLevel}/10`}
+          tone={skill.accuracyLevel >= 7 ? "success" : skill.accuracyLevel >= 4 ? "warning" : "destructive"}
+        />
+        <Meter
+          label="Độ ổn định"
+          value={skill.consistencyLevel}
+          max={10}
+          valueLabel={`${skill.consistencyLevel}/10`}
+          tone={
+            skill.consistencyLevel >= 7 ? "success" : skill.consistencyLevel >= 4 ? "warning" : "destructive"
+          }
+        />
+        <div className="flex items-center justify-between border-t border-border/60 pt-2.5">
+          <span className="text-xs text-muted-foreground">Độ khó gợi ý</span>
+          <span className="rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+            {DIFFICULTY_LABEL[skill.recommendedDifficulty] ?? skill.recommendedDifficulty}
+          </span>
+        </div>
+      </div>
+    </Panel>
+  )
+}
+
+function MistakeList({
+  mistakes,
+  onDrill,
+}: {
+  mistakes: MistakeSummaryEntry[]
+  onDrill?: (char: string) => void
+}) {
+  if (mistakes.length === 0) {
+    return (
+      <EmptyState
+        icon={Keyboard}
+        title="Chưa ghi nhận lỗi gõ"
+        description="Bật AI Adaptive khi luyện để hệ thống ghi lại những phím bạn hay gõ nhầm."
+      />
+    )
+  }
+
+  return (
+    <ul className="space-y-1.5">
+      {mistakes.map((mistake) => (
+        <li
+          key={`${mistake.target}->${mistake.typed}`}
+          className="flex items-center gap-2 rounded-lg border border-outline-variant/50 bg-surface-container-low/60 px-2.5 py-1.5"
+        >
+          <span className="grid size-7 shrink-0 place-items-center rounded-md border border-outline-variant/60 bg-surface-container-lowest font-mono text-[13px] font-semibold">
+            {mistake.target === " " ? "␣" : mistake.target}
+          </span>
+          <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="grid size-7 shrink-0 place-items-center rounded-md border border-destructive/30 bg-destructive/10 font-mono text-[13px] font-semibold text-destructive">
+            {mistake.typed === " " ? "␣" : mistake.typed}
+          </span>
+          <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
+            {formatNumber(mistake.count)} lần
+          </span>
+          {onDrill ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-[11px]"
+              onClick={() => onDrill(mistake.target)}
+            >
+              Luyện
+            </Button>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function OverviewPanel({
   data,
   newAchievements,
   onNavigate,
+  onDrill,
 }: {
   data: DashboardData
   newAchievements: Achievement[]
   onNavigate: (tab: DashboardTab) => void
+  onDrill?: (char: string) => void
 }) {
-  const { summary, bests, streak, sessions } = data
+  const { summary, bests, streak, sessions, activity, mistakes } = data
+  const activeDays = activity.filter((day) => day.sessions > 0).length
 
   return (
     <div className="space-y-4">
@@ -129,6 +310,28 @@ export function OverviewPanel({
         <StatTile label="Phút luyện" value={formatNumber(summary.totalTimeTyped / 60)} />
         <StatTile label="WPM trung bình" value={formatNumber(summary.averageWpm)} />
         <StatTile label="Chính xác" value={`${formatNumber(summary.averageAccuracy)}%`} />
+      </div>
+
+      <Panel
+        title="Hoạt động luyện tập"
+        description={`${activeDays}/${activity.length} ngày có luyện trong 18 tuần gần nhất`}
+        action={<HeatLegend />}
+      >
+        <ActivityHeatmap days={activity} />
+        <p className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <CalendarDays className="size-3.5 shrink-0" aria-hidden />
+          Đưa chuột lên từng ô để xem số phiên và số từ của ngày đó.
+        </p>
+      </Panel>
+
+      <div className="grid gap-3 @2xl/dialog:grid-cols-2">
+        <SkillSnapshot data={data} />
+        <Panel
+          title="Phím hay gõ sai"
+          description="Gộp từ các phiên bật AI Adaptive — bấm Luyện để tạo bài tập riêng"
+        >
+          <MistakeList mistakes={mistakes} onDrill={onDrill} />
+        </Panel>
       </div>
 
       {newAchievements.length > 0 ? (

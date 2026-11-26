@@ -69,10 +69,10 @@ jobs:
             --name "$env:APP_NAME" `
             --identifier "$env:APP_IDENTIFIER" `
             --icon ./desktop/icon.png `
-            --width 1280 `
-            --height 860 `
-            --min-width 960 `
-            --min-height 640 `
+            --width 1360 `
+            --height 900 `
+            --min-width 1080 `
+            --min-height 680 `
             --targets x64 `
             --keep-binary `
             --json | Tee-Object -FilePath pake-result.json

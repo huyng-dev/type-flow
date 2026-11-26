@@ -54,6 +54,7 @@ import {
   PanelRight,
   PanelRightClose,
   Coffee,
+  Focus,
 } from "lucide-react";
 
 type ModeType = "words" | "time" | "phrases";
@@ -90,8 +91,9 @@ export default function TypingGame() {
   const [avoidRepeats, setAvoidRepeats] = useState<boolean>(true);
   const [adaptiveMode, setAdaptiveMode] = useState<boolean>(true);
 
-  // Độ khó thực tế do AI đề xuất khi bật adaptiveMode
-  const aiDifficulty = adaptiveMode ? adaptiveAlgorithm.assessSkill().recommendedDifficulty : difficulty;
+  // Độ khó thực tế do AI đề xuất khi bật adaptiveMode. Giữ trong state và chỉ
+  // đọc dữ liệu adaptive sau khi mount, để bản render đầu khớp với server.
+  const [aiDifficulty, setAiDifficulty] = useState<DifficultyType>("medium");
 
   // Active Game State
   const [words, setWords] = useState<string[]>([]);
@@ -121,6 +123,8 @@ export default function TypingGame() {
   const [dashboardOpen, setDashboardOpen] = useState<boolean>(false);
   const [dashboardTab, setDashboardTab] = useState<DashboardTab>("overview");
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+  // Chế độ tập trung: ẩn thanh cấu hình + bảng phụ, không ghi đè preference.
+  const [focusMode, setFocusMode] = useState<boolean>(false);
 
   // DPM Mode — lớp phản hồi thưởng
   const [dopamineMode, setDopamineMode] = useState<DopamineMode>("balanced");
@@ -167,6 +171,20 @@ export default function TypingGame() {
       return !open;
     });
   }, []);
+
+  const toggleFocusMode = useCallback(() => setFocusMode((on) => !on), []);
+
+  // Phím tắt app-level: Ctrl/Cmd+B mở/đóng inspector panel.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        toggleSidebar();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [toggleSidebar]);
 
   const refreshEngagement = useCallback(() => {
     setEngagement(EngagementManager.getSnapshot());
@@ -388,6 +406,30 @@ export default function TypingGame() {
     }
   }, [words, resetSessionState, initializeGame]);
 
+  // Bài luyện tập trung: lọc các từ chứa phím hay gõ sai rồi nạp vào phiên mới
+  const startDrill = useCallback(
+    (char: string) => {
+      const pool = languageManager.generateContent({
+        language,
+        difficulty,
+        contentType: "words",
+        count: 240,
+        avoidRepeats: false,
+      });
+      const needle = char.toLowerCase();
+      const matches = Array.from(
+        new Set(pool.filter((word) => word.toLowerCase().includes(needle)))
+      );
+      const uniquePool = Array.from(new Set(pool));
+      const source = matches.length >= 8 ? matches : uniquePool;
+      const targetWords = source.slice(0, 25);
+
+      setDashboardOpen(false);
+      resetSessionState(targetWords);
+    },
+    [language, difficulty, resetSessionState]
+  );
+
   // Initialize on mount or when key settings change
   useEffect(() => {
     initializeGame();
@@ -408,7 +450,10 @@ export default function TypingGame() {
     setWordCount(saved.wordCount || 25);
     setAvoidRepeats(saved.avoidRepeats ?? true);
     setAdaptiveMode(saved.adaptiveMode ?? true);
-    setSidebarOpen(saved.sidebarOpen ?? true);
+    setAiDifficulty(adaptiveAlgorithm.assessSkill().recommendedDifficulty);
+    // Dưới 1200px panel là overlay nên không tự mở (sẽ che vùng gõ).
+    const panelFits = typeof window !== "undefined" && window.innerWidth >= 1200;
+    setSidebarOpen(panelFits ? (saved.sidebarOpen ?? true) : false);
     setDopamineMode(saved.dopamineMode ?? "balanced");
     setEffectsVolume(saved.effectsVolume ?? 0.6);
     setHaptics(saved.haptics ?? false);
@@ -609,6 +654,9 @@ export default function TypingGame() {
           commonErrors,
           timestamp: Date.now(),
         });
+
+        // Lịch sử vừa đổi → cập nhật độ khó AI gợi ý cho phiên kế tiếp.
+        setAiDifficulty(adaptiveAlgorithm.assessSkill().recommendedDifficulty);
       }
 
       // Động lực: XP, level, kỷ lục combo
@@ -1087,146 +1135,145 @@ export default function TypingGame() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col justify-between selection:bg-primary/20 selection:text-primary">
-      {/* Top Header Navigation */}
-      <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground selection:bg-primary/20 selection:text-primary">
+      {/* Title bar — app chrome */}
+      <header className="relative z-40 flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-background/85 px-3 backdrop-blur-xl">
         <span
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent"
         />
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4">
-          {/* Logo & Brand */}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={initializeGame}
-              className="group flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg text-left transition-[scale,opacity] duration-150 active:duration-75 motion-safe:active:scale-[0.98] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              title="TypeFlow 2.0 - Luyện gõ tiếng Việt & English thông minh (Bấm để bắt đầu bài mới)"
-            >
-              <div className="shrink-0 transition-[translate] duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)] group-hover:-translate-y-0.5">
-                <LogoConcept1Isometric size={32} />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[1.3rem] leading-none font-extrabold tracking-tight text-foreground">
-                    Type<span className="text-foreground/75">Flow</span>
-                  </span>
-                  <span className="rounded-full border border-border/70 bg-muted/50 px-1.5 py-0.5 text-[9.5px] leading-none font-bold tracking-[0.14em] text-muted-foreground uppercase">
-                    2.0
-                  </span>
-                </div>
-                <p className="mt-1 hidden text-[11px] leading-none text-muted-foreground sm:block">
-                  Luyện gõ tiếng Việt & English thông minh
-                </p>
-              </div>
-            </button>
-          </div>
-
-          {/* Quick Stats & Controls */}
-          <div className="flex items-center gap-1.5">
-            {/* Streak */}
-            {streakInfo && streakInfo.current > 0 && (
-              <>
-                <Badge
-                  variant="outline"
-                  className="hidden h-9 items-center gap-1.5 rounded-lg border-warning/30 bg-warning/10 px-2.5 text-warning sm:flex"
-                >
-                  <Flame className="size-3.5 fill-warning/20" aria-hidden />
-                  <span className="text-[11px] leading-none font-bold tabular-nums">
-                    {streakInfo.current} ngày
-                  </span>
-                </Badge>
-                <span
-                  aria-hidden
-                  className="mx-0.5 hidden h-6 w-px bg-border sm:block"
-                />
-              </>
-            )}
-
-            {/* DPM Mode */}
-            <DopamineControl
-              mode={dopamineMode}
-              onModeChange={handleDopamineModeChange}
-              effectsVolume={effectsVolume}
-              onEffectsVolumeChange={handleEffectsVolumeChange}
-              haptics={haptics}
-              onHapticsChange={handleHapticsChange}
-              wellbeingNudges={wellbeingNudges}
-              onWellbeingNudgesChange={handleWellbeingChange}
-              reducedMotion={reducedMotion}
-              level={engagement?.level ?? 1}
-              onReset={handleResetEngagement}
-            />
-
-            <span aria-hidden className="mx-0.5 hidden h-6 w-px bg-border md:block" />
-
-            {/* Sound Toggle */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={cycleSoundSwitch}
-              className="h-9 gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-              title={`Âm thanh phím: ${soundSwitch === "off" ? "Tắt" : soundSwitch.toUpperCase()}`}
-              aria-label={`Âm thanh phím: ${soundSwitch}`}
-            >
-              <span
-                key={soundSwitch}
-                className="inline-flex animate-in fade-in zoom-in-75 duration-150"
-              >
-                {soundSwitch === "off" ? (
-                  <VolumeX className="size-4" aria-hidden />
-                ) : (
-                  <Volume2 className="size-4 text-primary" aria-hidden />
-                )}
+        {/* Identity + streak */}
+        <div className="flex min-w-0 items-center gap-2.5">
+          <button
+            type="button"
+            onClick={initializeGame}
+            className="group flex min-w-0 cursor-pointer items-center gap-2 rounded-md text-left transition-[scale,opacity] duration-150 active:duration-75 motion-safe:active:scale-[0.98] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            title="TypeFlow 2.0 - Luyện gõ tiếng Việt & English thông minh (Bấm để bắt đầu bài mới)"
+          >
+            <div className="shrink-0 transition-[translate] duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)] group-hover:-translate-y-0.5">
+              <LogoConcept1Isometric size={28} />
+            </div>
+            <span className="flex items-center gap-1.5 text-base leading-none font-extrabold tracking-tight text-foreground">
+              Type<span className="text-foreground/75">Flow</span>
+              <span className="rounded-full border border-border/70 bg-muted/50 px-1.5 py-0.5 text-[9px] leading-none font-bold tracking-[0.14em] text-muted-foreground uppercase">
+                2.0
               </span>
-              <span className="hidden capitalize md:inline">
-                {soundSwitch === "off" ? "Tắt âm" : soundSwitch === "linear" ? "Red" : soundSwitch}
-              </span>
-            </Button>
+            </span>
+          </button>
 
-            {/* Dashboard */}
-            <Button
+          <span aria-hidden className="hidden h-5 w-px bg-border md:block" />
+
+          {streakInfo && streakInfo.current > 0 ? (
+            <Badge
               variant="outline"
-              size="sm"
-              onClick={() => openDashboard("overview")}
-              className="h-9 gap-1.5 rounded-lg border-border/70 px-2.5 text-xs font-medium hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+              className="hidden h-6 items-center gap-1.5 rounded-md border-warning/30 bg-warning/10 px-2 text-warning md:flex"
+              title={`Chuỗi luyện ${streakInfo.current} ngày · dài nhất ${streakInfo.longest} ngày`}
             >
-              <BarChart3 className="size-4 text-primary" aria-hidden />
-              <span className="hidden md:inline">Bảng điều khiển</span>
-            </Button>
+              <Flame className="size-3.5 fill-warning/20" aria-hidden />
+              <span className="text-[11px] leading-none font-bold tabular-nums">
+                {streakInfo.current} ngày
+              </span>
+            </Badge>
+          ) : null}
+        </div>
 
-            {/* Ẩn/hiện bảng phụ (chỉ trên desktop) */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleSidebar}
-              aria-pressed={sidebarOpen}
-              aria-label={sidebarOpen ? "Ẩn bảng phụ" : "Hiện bảng phụ"}
-              title={sidebarOpen ? "Ẩn bảng phụ" : "Hiện bảng phụ"}
-              className="hidden h-9 w-9 rounded-lg px-0 text-muted-foreground hover:bg-muted/60 hover:text-foreground xl:inline-flex"
+        {/* Session controls */}
+        <div className="flex items-center gap-1">
+          {/* DPM Mode */}
+          <DopamineControl
+            mode={dopamineMode}
+            onModeChange={handleDopamineModeChange}
+            effectsVolume={effectsVolume}
+            onEffectsVolumeChange={handleEffectsVolumeChange}
+            haptics={haptics}
+            onHapticsChange={handleHapticsChange}
+            wellbeingNudges={wellbeingNudges}
+            onWellbeingNudgesChange={handleWellbeingChange}
+            reducedMotion={reducedMotion}
+            level={engagement?.level ?? 1}
+            onReset={handleResetEngagement}
+          />
+
+          <span aria-hidden className="mx-1 hidden h-5 w-px bg-border md:block" />
+
+          {/* Sound Toggle */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={cycleSoundSwitch}
+            className="h-8 w-8 gap-1.5 rounded-md px-0 text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground lg:w-auto lg:px-2.5"
+            title={`Âm thanh phím: ${soundSwitch === "off" ? "Tắt" : soundSwitch.toUpperCase()}`}
+            aria-label={`Âm thanh phím: ${soundSwitch}`}
+          >
+            <span
+              key={soundSwitch}
+              className="inline-flex animate-in fade-in zoom-in-75 duration-150"
             >
-              {sidebarOpen ? (
-                <PanelRightClose className="size-4" aria-hidden />
+              {soundSwitch === "off" ? (
+                <VolumeX className="size-4" aria-hidden />
               ) : (
-                <PanelRight className="size-4" aria-hidden />
+                <Volume2 className="size-4 text-primary" aria-hidden />
               )}
-            </Button>
+            </span>
+            <span className="hidden capitalize lg:inline">
+              {soundSwitch === "off" ? "Tắt âm" : soundSwitch === "linear" ? "Red" : soundSwitch}
+            </span>
+          </Button>
 
-            {/* Theme Selector */}
-            <ThemeSelector />
-          </div>
+          {/* Dashboard */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => openDashboard("overview")}
+            className="h-8 gap-1.5 rounded-md border-border/70 px-2.5 text-xs font-medium hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+          >
+            <BarChart3 className="size-4 text-primary" aria-hidden />
+            <span className="hidden lg:inline">Bảng điều khiển</span>
+          </Button>
+
+          <span aria-hidden className="mx-1 hidden h-5 w-px bg-border md:block" />
+
+          {/* Focus mode */}
+          <Button
+            variant={focusMode ? "secondary" : "ghost"}
+            size="sm"
+            onClick={toggleFocusMode}
+            aria-pressed={focusMode}
+            aria-label={focusMode ? "Thoát chế độ tập trung" : "Bật chế độ tập trung"}
+            title={focusMode ? "Thoát chế độ tập trung" : "Chế độ tập trung — ẩn thanh cấu hình và bảng phụ"}
+            className="h-8 w-8 rounded-md px-0 text-muted-foreground hover:bg-muted/60 hover:text-foreground aria-pressed:bg-primary/10 aria-pressed:text-primary"
+          >
+            <Focus className="size-4" aria-hidden />
+          </Button>
+
+          {/* Inspector panel */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleSidebar}
+            aria-pressed={sidebarOpen}
+            aria-label={sidebarOpen ? "Ẩn bảng phụ" : "Hiện bảng phụ"}
+            title={`${sidebarOpen ? "Ẩn" : "Hiện"} bảng phụ (Ctrl+B)`}
+            className="h-8 w-8 rounded-md px-0 text-muted-foreground hover:bg-muted/60 hover:text-foreground aria-pressed:bg-muted/60 aria-pressed:text-foreground"
+          >
+            {sidebarOpen ? (
+              <PanelRightClose className="size-4" aria-hidden />
+            ) : (
+              <PanelRight className="size-4" aria-hidden />
+            )}
+          </Button>
+
+          {/* Theme Selector */}
+          <ThemeSelector />
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
-        <div
-          className={`grid gap-5 transition-[grid-template-columns] duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)] ${
-            sidebarOpen ? "xl:grid-cols-[minmax(0,1fr)_300px]" : "xl:grid-cols-[minmax(0,1fr)_0px]"
-          }`}
-        >
-          {/* Vùng gõ luôn căn giữa để giữ tập trung, bất kể sidebar mở hay đóng */}
-          <div className="mx-auto w-full min-w-0 max-w-3xl">
+      {/* Workspace: main scroll + inspector panel */}
+      <div className="relative flex min-h-0 flex-1">
+        <main className="min-w-0 flex-1 overflow-y-auto">
+          <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 py-6">
+            {/* my-auto: canh giữa dọc khi còn chỗ trống, tự dồn lên trên khi nội dung dài hơn màn hình */}
+            <div className="mx-auto my-auto w-full min-w-0 max-w-3xl">
             {/* Test Result View (When test completed) */}
             {isComplete && currentScore ? (
               <TestResult
@@ -1244,10 +1291,10 @@ export default function TypingGame() {
             ) : (
               /* Active Typing Arena & Controls */
               <div className="w-full space-y-5 animate-in fade-in duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)]">
-            {/* Pill Navigation Toolbar */}
-            <div className="flex flex-wrap items-center justify-center gap-3 p-2 rounded-2xl bg-card/70 border border-border/80 shadow-xs backdrop-blur-xs">
+            {/* Config bar — một card duy nhất */}
+            <div className={`flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-border/80 bg-card/70 p-2 shadow-xs backdrop-blur-xs ${focusMode ? "hidden" : ""}`}>
               {/* Language Selector */}
-              <div className="flex items-center gap-1 bg-background/80 p-1 rounded-xl border border-border/60">
+              <div className="flex items-center gap-1 rounded-lg bg-background/60 p-1">
                 <Globe className="w-3.5 h-3.5 ml-2 text-muted-foreground" />
                 <SegmentedHighlight className="flex items-center gap-1">
                   <button
@@ -1268,7 +1315,7 @@ export default function TypingGame() {
               </div>
 
               {/* Mode Selector */}
-              <div className="flex items-center gap-1 bg-background/80 p-1 rounded-xl border border-border/60">
+              <div className="flex items-center gap-1 rounded-lg bg-background/60 p-1">
                 <SegmentedHighlight className="flex items-center gap-1">
                   <button
                     onClick={() => handleModeChange("words")}
@@ -1298,7 +1345,7 @@ export default function TypingGame() {
               </div>
 
               {/* Word Count / Time Limit Options */}
-              <div className="flex items-center gap-1 bg-background/80 p-1 rounded-xl border border-border/60">
+              <div className="flex items-center gap-1 rounded-lg bg-background/60 p-1">
                 <SegmentedHighlight className="flex items-center gap-1">
                   {mode === "time"
                     ? [15, 30, 60, 120].map((t) => (
@@ -1328,7 +1375,7 @@ export default function TypingGame() {
               </div>
 
               {/* Difficulty */}
-              <div className="flex items-center gap-1 bg-background/80 p-1 rounded-xl border border-border/60">
+              <div className="flex items-center gap-1 rounded-lg bg-background/60 p-1">
                 <Gauge className="w-3.5 h-3.5 ml-2 text-muted-foreground" />
                 <SegmentedHighlight className="flex items-center gap-1">
                   {(["easy", "medium", "hard"] as DifficultyType[]).map((d) => {
@@ -1606,48 +1653,63 @@ export default function TypingGame() {
               </div>
             )}
           </div>
+          </div>
+        </main>
 
-          {sidebarOpen ? (
-            <aside className="hidden xl:sticky xl:top-20 xl:block xl:self-start animate-in fade-in slide-in-from-right-2 duration-200 ease-[cubic-bezier(0.2,0.9,0.4,1)]">
+        {/* Inspector panel — in-flow từ xl, overlay bên dưới để không ép cột gõ */}
+        {sidebarOpen && !focusMode ? (
+          <>
+            <button
+              type="button"
+              aria-label="Đóng bảng phụ"
+              tabIndex={-1}
+              onClick={toggleSidebar}
+              className="fixed inset-x-0 top-12 bottom-8 z-30 bg-background/60 backdrop-blur-[2px] min-[1200px]:hidden"
+            />
+            <aside className="fixed top-12 right-0 bottom-8 z-40 w-[320px] max-w-[85vw] border-l border-border/70 bg-surface-container-low shadow-2xl min-[1200px]:static min-[1200px]:z-auto min-[1200px]:h-auto min-[1200px]:w-[320px] min-[1200px]:shrink-0 min-[1200px]:shadow-none">
               <PracticeSidebar
                 streakInfo={streakInfo}
                 recentSessions={recentSessions}
                 onOpenDashboard={openDashboard}
                 engagement={engagement}
                 onClaimQuest={handleClaimQuest}
+                onClose={toggleSidebar}
               />
             </aside>
-          ) : null}
-        </div>
+          </>
+        ) : null}
+      </div>
 
-        {/* Màn hình nhỏ: các thẻ phụ xuống dưới khu gõ */}
-        <div className="mt-6 xl:hidden">
-          <PracticeSidebar
-            streakInfo={streakInfo}
-            recentSessions={recentSessions}
-            onOpenDashboard={openDashboard}
-            layout="grid"
-            engagement={engagement}
-            onClaimQuest={handleClaimQuest}
-          />
+      {/* Status bar */}
+      <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 bg-background/85 px-4 text-[11px] text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-2">
+          <Keyboard className="size-3.5 shrink-0" aria-hidden />
+          <span className="truncate">Bộ gõ: Telex / VNI · Tiếng Việt chuẩn</span>
+          <span aria-hidden className="hidden h-3 w-px bg-border sm:block" />
+          <span className="hidden items-center gap-1.5 sm:inline-flex">
+            <span className="size-1.5 rounded-full bg-success" aria-hidden />
+            Lưu cục bộ
+          </span>
         </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-border/40 py-5 text-xs text-muted-foreground">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 text-center sm:flex-row sm:text-left">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <span className="font-semibold text-foreground">TypeFlow</span>
-            <span aria-hidden>·</span>
-            <span>Phím tắt</span>
-            <kbd className="rounded border border-border/70 bg-muted px-1.5 py-0.5 font-mono text-[10px]">
-              Tab + Enter / Esc
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="hidden items-center gap-1.5 sm:inline-flex">
+            <kbd className="rounded border border-border/70 bg-muted/70 px-1.5 py-0.5 font-mono text-[10px]">
+              Tab + Enter
             </kbd>
-            <span>để thử lại</span>
-          </div>
-          <div>
-            <span>Hỗ trợ bộ gõ Telex / VNI và tiếng Anh chuẩn quốc tế</span>
-          </div>
+            Bài mới
+          </span>
+          <span className="hidden items-center gap-1.5 md:inline-flex">
+            <kbd className="rounded border border-border/70 bg-muted/70 px-1.5 py-0.5 font-mono text-[10px]">
+              Esc
+            </kbd>
+            Thử lại
+          </span>
+          <span className="hidden items-center gap-1.5 lg:inline-flex">
+            <kbd className="rounded border border-border/70 bg-muted/70 px-1.5 py-0.5 font-mono text-[10px]">
+              Ctrl B
+            </kbd>
+            Bảng phụ
+          </span>
         </div>
       </footer>
 
@@ -1659,6 +1721,7 @@ export default function TypingGame() {
         initialTab={dashboardTab}
         score={currentScore ?? undefined}
         newAchievements={newAchievements}
+        onDrill={startDrill}
       />
     </div>
   );

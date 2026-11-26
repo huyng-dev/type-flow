@@ -33,6 +33,20 @@ export function toneTextClass(tone: Tone): string {
   return TONE_TEXT[tone]
 }
 
+/** Số có hiệu ứng đếm lên — dùng cho các thẻ kết quả dạng bento. */
+export function AnimatedNumber({
+  value,
+  format,
+  className,
+}: {
+  value: number
+  format?: (value: number) => string
+  className?: string
+}) {
+  const display = useAnimatedNumber(value, true, format)
+  return <span className={className}>{display}</span>
+}
+
 export function Panel({
   title,
   description,
@@ -49,7 +63,7 @@ export function Panel({
   contentClassName?: string
 }) {
   return (
-    <section className={cn("rounded-xl border border-border/70 bg-background/40 p-4", className)}>
+    <section className={cn("rounded-2xl border border-outline-variant/60 bg-surface-container-lowest/80 p-4", className)}>
       {title || action ? (
         <header className="mb-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -88,7 +102,7 @@ export function StatTile({
   const displayValue = useAnimatedNumber(value, animateValue, format)
 
   return (
-    <div className={cn("rounded-xl border border-border/70 bg-background/50 px-4 py-3", className)}>
+    <div className={cn("rounded-xl border border-outline-variant/60 bg-surface-container-lowest/70 px-4 py-3", className)}>
       <div className="flex items-baseline gap-1">
         <span
           className={cn(
