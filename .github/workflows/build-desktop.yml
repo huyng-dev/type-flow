@@ -1,0 +1,93 @@
+name: Build desktop app
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  APP_NAME: Type Flow
+  APP_IDENTIFIER: com.typeflow.app
+
+jobs:
+  windows:
+    name: Windows installer (x64)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build static export
+        run: npm run build
+
+      - name: Verify static export
+        shell: pwsh
+        run: |
+          if (-not (Test-Path ./out/index.html)) {
+            throw "Static export missing: out/index.html was not produced by 'next build'."
+          }
+
+      - name: Ensure Rust toolchain
+        shell: pwsh
+        run: |
+          if (-not (Get-Command rustc -ErrorAction SilentlyContinue)) {
+            Invoke-WebRequest https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
+            ./rustup-init.exe -y --default-toolchain stable --profile minimal
+            "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+            Remove-Item rustup-init.exe
+          }
+          rustc -V
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Install Pake CLI
+        run: npm install --global pake-cli
+
+      - name: Package desktop app
+        shell: pwsh
+        run: |
+          pake ./out `
+            --name "$env:APP_NAME" `
+            --identifier "$env:APP_IDENTIFIER" `
+            --icon ./desktop/icon.png `
+            --width 1280 `
+            --height 860 `
+            --min-width 960 `
+            --min-height 640 `
+            --targets x64 `
+            --keep-binary `
+            --json | Tee-Object -FilePath pake-result.json
+          if ($LASTEXITCODE -ne 0) { throw "Pake build failed with exit code $LASTEXITCODE" }
+
+      - name: Show build result
+        shell: pwsh
+        run: Get-Content pake-result.json
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: type-flow-windows-x64
+          if-no-files-found: error
+          path: |
+            *.msi
+            *.exe
+            pake-result.json
