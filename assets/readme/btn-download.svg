@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="226" height="56" viewBox="0 0 226 56" role="img" aria-label="Tải TypeFlowing cho Windows x64">
+  <title>Tải TypeFlowing cho Windows x64</title>
+  <defs>
+    <linearGradient id="tf-dl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b2b31"/>
+      <stop offset="1" stop-color="#161619"/>
+    </linearGradient>
+  </defs>
+  <rect x="0.5" y="0.5" width="225" height="55" rx="14" fill="url(#tf-dl)" stroke="#0c0c0e" stroke-opacity="0.6"/>
+  <g fill="#fafafa">
+    <rect x="25" y="19" width="8" height="8" rx="1.4"/>
+    <rect x="35" y="19" width="8" height="8" rx="1.4"/>
+    <rect x="25" y="29" width="8" height="8" rx="1.4"/>
+    <rect x="35" y="29" width="8" height="8" rx="1.4"/>
+  </g>
+  <text x="58" y="25" font-family="Inter, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="600" fill="#fafafa">Tải cho Windows</text>
+  <text x="58" y="41" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="10.5" fill="#a1a1aa">TypeFlowing.msi · 11 MB</text>
+</svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="226" height="56" viewBox="0 0 226 56" role="img" aria-label="Truy cập bản web tại typeflowing.netlify.app">
+  <title>Truy cập bản web — typeflowing.netlify.app</title>
+  <defs>
+    <linearGradient id="tf-web" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f7f7f8"/>
+    </linearGradient>
+  </defs>
+  <rect x="0.5" y="0.5" width="225" height="55" rx="14" fill="url(#tf-web)" stroke="#e4e4e7"/>
+  <g fill="none" stroke="#18181b" stroke-width="1.5" stroke-linecap="round">
+    <circle cx="34" cy="28" r="8.5"/>
+    <path d="M25.5 28h17"/>
+    <ellipse cx="34" cy="28" rx="3.7" ry="8.5"/>
+  </g>
+  <text x="58" y="25" font-family="Inter, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="600" fill="#18181b">Truy cập bản web</text>
+  <text x="58" y="41" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="10.5" fill="#71717a">typeflowing.netlify.app</text>
+</svg>

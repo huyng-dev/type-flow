@@ -28,7 +28,9 @@ rồi tự điều chỉnh độ khó cùng danh sách từ dựa trên chính l
 
 <br />
 
-[![Tải về cho Windows x64](https://img.shields.io/badge/Tải_về_cho_Windows-x64-18181b?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/huyng-dev/type-flowing/releases/latest)
+<a href="https://typeflowing.netlify.app/"><img src="assets/readme/btn-web.svg" alt="Truy cập bản web — typeflowing.netlify.app" width="226" height="56" /></a>
+&nbsp;&nbsp;
+<a href="https://github.com/huyng-dev/type-flowing/releases/latest/download/TypeFlowing.msi"><img src="assets/readme/btn-download.svg" alt="Tải TypeFlowing cho Windows x64" width="226" height="56" /></a>
 
 </div>
 
@@ -87,6 +89,8 @@ TypeFlowing là một **phòng luyện gõ phím** dành cho người Việt, ch
 
 ## Tải về
 
+**Bản web (không cần cài đặt):** [typeflowing.netlify.app](https://typeflowing.netlify.app/)
+
 Bản dựng sẵn cho **Windows x64** nằm ở [trang Releases](https://github.com/huyng-dev/type-flowing/releases/latest). Hai file trong mục **Assets**:
 
 | File | Khi nào dùng | Tải trực tiếp |
@@ -133,6 +137,10 @@ flowchart LR
 | **Lưu trữ** | `localStorage` — không server, không cơ sở dữ liệu |
 
 ## Cài đặt & chạy bản web
+
+**Bản web đang chạy sẵn tại [typeflowing.netlify.app](https://typeflowing.netlify.app/)** — mở là dùng, không cần cài đặt gì.
+
+Chạy trên máy của bạn:
 
 **Yêu cầu:** Node.js 18 trở lên (khuyến nghị 20/22) và npm.
 
